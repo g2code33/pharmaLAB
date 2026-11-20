@@ -115,19 +115,39 @@ export function ProtocolBench({
     volume = exp.conditions.volume ?? "0.03",
     unit = (exp.conditions.stockUnit ?? "mM") as "M" | "mM" | "µM" | "nM";
   const recordFrom = t.recordFromS ?? 0;
-  const [showExample, exampleTo] = useState(false);
+  const [showExample, exampleTo] = useState(
+    () =>
+      !t.stopped &&
+      !t.elapsed &&
+      !p.manual?.length &&
+      !p.transfers?.length &&
+      !exp.events.length,
+  );
   // This read-only example is never written to the active experiment or exports.
   const demo = useMemo(() => {
     if (!showExample) return [];
     const plan = workstationPreset().plan;
-    plan.durationS = 200;
-    plan.transfers = [1e-7, 4e-7, 1.6e-6, 6.4e-6].flatMap(
-      (stockM, i): Transfer[] => [
-        { s: 5 + 50 * i, kind: "add", stockM, volumeMl: 0.1 },
-        { s: 29 + 50 * i, kind: "exchange", nominalM: 0 },
+    // Teaching scenario, not a fit to ObSim or a change to the live tissue profile.
+    plan.durationS = 2243;
+    plan.knobs = {
+      ...plan.knobs,
+      preloadG: 1.5,
+      scaleG: 3.45,
+      ec50M: 1.5e-6,
+      slope: 2,
+      peakS: 2,
+      tonic: 1,
+      washS: 1,
+    };
+    const onset = [2163, 2182, 2202, 2231],
+      wash = [2172, 2193, 2213, 2243];
+    plan.transfers = [0.76e-6, 1.52e-6, 3.04e-6, 6.08e-6].flatMap(
+      (target, i): Transfer[] => [
+        { s: onset[i], kind: "add", stockM: target * 31, volumeMl: 0.1 },
+        { s: wash[i], kind: "exchange", nominalM: 0 },
       ],
     );
-    return sampleProtocol(plan, 200);
+    return sampleProtocol(plan, plan.durationS);
   }, [showExample]);
   const example = showExample && !playing && !t.elapsed;
   const locked =
@@ -663,8 +683,8 @@ export function ProtocolBench({
                   key={example ? "example" : "live"}
                   points={example ? demo : observed}
                   reference={example ? [] : reference}
-                  start={example ? 0 : windowStart}
-                  span={example ? 200 : span}
+                  start={example ? 2143 : windowStart}
+                  span={example ? 100 : span}
                   annotations={example ? [] : annotations}
                   recordFrom={example ? 0 : recordFrom}
                   example={example}
@@ -713,7 +733,12 @@ export function ProtocolBench({
                     <Waves size={15} />
                     Wash
                   </button>
-                  <button onClick={annotate}>
+                  <button
+                    onClick={() => {
+                      exampleTo(false);
+                      annotate();
+                    }}
+                  >
                     <NotebookPen size={14} />
                     Annotate
                   </button>
@@ -728,9 +753,9 @@ export function ProtocolBench({
                     <input
                       type="number"
                       min="0"
-                      max={t.elapsed}
+                      max={example ? 2243 : t.elapsed}
                       disabled={example}
-                      value={example ? 0 : windowStart}
+                      value={example ? 2143 : windowStart}
                       onChange={(e) =>
                         pan(
                           Math.max(
@@ -745,9 +770,9 @@ export function ProtocolBench({
                     type="range"
                     aria-label="Scroll chart time"
                     min={0}
-                    max={t.elapsed}
+                    max={example ? 2243 : t.elapsed}
                     disabled={example || !t.elapsed}
-                    value={windowStart}
+                    value={example ? 2143 : windowStart}
                     onChange={(e) => pan(+e.target.value)}
                   />
                   <button
@@ -760,7 +785,7 @@ export function ProtocolBench({
                     Window size
                     <select
                       disabled={example}
-                      value={example ? 200 : span}
+                      value={example ? 100 : span}
                       onChange={(e) => zoom(+e.target.value)}
                     >
                       {[
@@ -773,7 +798,7 @@ export function ProtocolBench({
                           300,
                           900,
                           7200,
-                          example ? 200 : span,
+                          example ? 100 : span,
                         ]),
                       ]
                         .sort((a, b) => a - b)

@@ -1047,3 +1047,70 @@ html[data-theme="Dark"] .kymograph {
     font-size: 11px;
   }
 }
+/* Strip chart axes and grid share the same data coordinates as the pen. */
+.stripChart .graticule {
+  background-image: none;
+  margin-right: 23px;
+}
+.stripRules line {
+  stroke: var(--rule);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.stripChart .yTicks {
+  display: block;
+}
+.stripChart .yTicks span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+}
+.stripChart .xTicks {
+  position: relative;
+  height: 19px;
+  margin-right: 23px;
+  display: block;
+}
+.stripChart .xTicks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.stripChart .paperEvents {
+  margin-right: 23px;
+}
+.stripChart .paperCursor output {
+  top: auto;
+  bottom: 3px;
+  font-weight: 600;
+}
+.scaleKeys {
+  position: absolute;
+  right: -3px;
+  top: 42%;
+  display: grid;
+  gap: 2px;
+}
+.scaleKeys button {
+  padding: 0;
+  width: 21px;
+  height: 23px;
+  font: 16px var(--mono);
+}
+.stripChart .axisTime span {
+  color: var(--muted);
+}
+.stripChart .inkTrace {
+  stroke: #2441d7;
+}
+html[data-theme="Dark"] .stripChart .inkTrace {
+  stroke: #97a8ff;
+}
+@media (max-width: 760px) {
+  .stripChart .minorTick {
+    display: none;
+  }
+  .stripChart .xTicks,
+  .stripChart .yTicks {
+    font-size: 10px;
+  }
+}

@@ -107,7 +107,7 @@ test("example kymograph is inspectable and leaves the live bath untouched", asyn
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "View example tracing" }).click();
+
   await expect(
     page.getByRole("heading", { name: "Example kymograph" }),
   ).toBeVisible();
@@ -117,9 +117,18 @@ test("example kymograph is inspectable and leaves the live bath untouched", asyn
   await expect(
     page.locator(".scopeMark").filter({ hasText: "Wash" }),
   ).toHaveCount(4);
+  await expect(page.locator(".xTicks")).toContainText("2150");
+  await expect(page.locator(".axisTime")).toContainText(
+    "Peaks exceed display range",
+  );
+  await page.getByRole("button", { name: "Decrease vertical gain" }).click();
+  await page.getByRole("button", { name: "Decrease vertical gain" }).click();
+  await expect(page.locator(".axisTime")).not.toContainText(
+    "Peaks exceed display range",
+  );
   await page.locator(".graticule").focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator(".paperCursor output")).toContainText("1 s");
+  await expect(page.locator(".paperCursor output")).toContainText("2193 s");
   await page.getByRole("button", { name: "Return to live chart" }).click();
   await expect(
     page.getByText("Ready to record", { exact: true }),

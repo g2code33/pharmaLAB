@@ -25,7 +25,7 @@ export function TraceScreen({
   example: boolean;
   onExample: () => void;
 }) {
-  const [cursor, select] = useState<number | null>(null);
+  const [cursor, select] = useState<number | null>(example ? 2192 : null);
   const last = points.at(-1)!,
     g = last.forceG !== null,
     unit = g ? "g" : "%",
@@ -33,13 +33,20 @@ export function TraceScreen({
   const inWindow = (p: Point) => p.s >= start && p.s <= start + span,
     rows = points.filter((p) => p.s >= recordFrom && inWindow(p)),
     overlay = reference.filter(inWindow);
-  const ymax =
+  const [gain, setGain] = useState(1);
+  const ymin = g
+    ? Math.min(points[0].forceG ?? 0, ...rows.map(read), ...overlay.map(read))
+    : 0;
+  const autoMax =
     Math.ceil(
       Math.max(g ? 1 : 100, ...rows.map(read), ...overlay.map(read)) /
         (g ? 1 : 25),
     ) * (g ? 1 : 25);
+  const ymax =
+    ymin + (example ? 2.25 : Math.max(g ? 0.25 : 25, autoMax - ymin)) / gain;
   const x = (s: number) => ((s - start) * 100) / span,
-    y = (n: number) => 100 - (100 * n) / ymax,
+    y = (n: number) =>
+      100 - 100 * Math.min(1, Math.max(0, (n - ymin) / (ymax - ymin))),
     path = (r: Point[]) => r.map((q) => `${x(q.s)},${y(read(q))}`).join(" ");
   const acquired = last.s > 0 && last.s >= recordFrom,
     selected =
@@ -50,6 +57,23 @@ export function TraceScreen({
       inWindow(points[cursor])
         ? points[cursor]
         : null;
+  // Label ticks in absolute seconds (e.g. 2150, 2160...), not percentages of the window.
+  function ticks(lo: number, hi: number, step: number) {
+    const out: number[] = [];
+    for (let i = Math.ceil(lo / step); i <= Math.floor(hi / step); i++)
+      out.push(i * step);
+    return out;
+  }
+  const xt = ticks(start, start + span, Math.max(1, Math.round(span / 10))),
+    step0 = (ymax - ymin) / 4,
+    base = 10 ** Math.floor(Math.log10(step0)),
+    ystep =
+      [1, 2, 2.5, 5, 10].reduce((a, b) =>
+        Math.abs(a - step0 / base) < Math.abs(b - step0 / base) ? a : b,
+      ) * base,
+    yt = ticks(ymin, ymax, ystep);
+  const clipped =
+    rows.some((q) => read(q) > ymax) || overlay.some((q) => read(q) > ymax);
   const events = new Map<number, string[]>();
   function mark(s: number, text: string) {
     if (s >= start && s <= start + span)
@@ -62,7 +86,7 @@ export function TraceScreen({
         event === "wash"
           ? "Wash"
           : event.startsWith("add")
-            ? `ACh${q.commands?.length ? "" : ` ${q.nominalM.toExponential(1)} M`}`
+            ? `ACh${q.commands?.length ? "" : ` ${q.nominalM.toExponential(2)} M`}`
             : "Flush",
       );
     }
@@ -80,19 +104,39 @@ export function TraceScreen({
       return { s, left, lane, label, title: `${s} s · ${list.join(" · ")}` };
     });
   return (
-    <div className="scope kymograph">
+    <div className="scope kymograph stripChart">
       <div className="paperHead">
         <b>
           {g ? "Isometric force (g) · assumed scale" : "Isometric response (%)"}
         </b>
         <span>
-          {example ? "Illustrative protocol · simulated" : "Simulated · 1 Hz"}
+          {example ? "Example only · assumed gram scale" : "Simulated · 1 Hz"}
         </span>
       </div>
       <div className="paperBody">
+        <div className="scaleKeys">
+          <button
+            aria-label="Increase vertical gain"
+            title="Increase vertical gain"
+            disabled={gain >= 8}
+            onClick={() => setGain(gain * 2)}
+          >
+            +
+          </button>
+          <button
+            aria-label="Decrease vertical gain"
+            title="Decrease vertical gain"
+            disabled={gain <= 0.125}
+            onClick={() => setGain(gain / 2)}
+          >
+            −
+          </button>
+        </div>
         <div className="yTicks">
-          {[1, 0.75, 0.5, 0.25, 0].map((f) => (
-            <span key={f}>{fmt(f * ymax)}</span>
+          {yt.map((v) => (
+            <span key={v} style={{ top: `${y(v)}%` }}>
+              {fmt(v)}
+            </span>
           ))}
         </div>
         <div
@@ -135,6 +179,14 @@ export function TraceScreen({
             role="img"
             aria-label="Kymograph tracing versus virtual seconds"
           >
+            <g className="stripRules">
+              {xt.map((v) => (
+                <line key={"t" + v} x1={x(v)} x2={x(v)} y1="0" y2="100" />
+              ))}
+              {yt.map((v) => (
+                <line key={"f" + v} x1="0" x2="100" y1={y(v)} y2={y(v)} />
+              ))}
+            </g>
             {overlay.length > 0 && (
               <polyline
                 points={path(overlay)}
@@ -168,8 +220,14 @@ export function TraceScreen({
         </div>
       </div>
       <div className="xTicks">
-        {[0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => (
-          <span key={f}>{fmt(start + f * span)}</span>
+        {xt.map((v, i) => (
+          <span
+            key={v}
+            className={i % 2 ? "minorTick" : ""}
+            style={{ left: `${x(v)}%` }}
+          >
+            {fmt(v)}
+          </span>
         ))}
       </div>
       <div
@@ -192,7 +250,9 @@ export function TraceScreen({
           </span>
         ))}
       </div>
-      <div className="axisTime">Time (s)</div>
+      <div className="axisTime">
+        Time (s){clipped && <span> · Peaks exceed display range</span>}
+      </div>
     </div>
   );
 }
