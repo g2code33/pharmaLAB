@@ -6,7 +6,7 @@ Local virtual pharmacology laboratory for guinea-pig ileum and acetylcholine. Th
 
 With Node 22 and npm: `npm ci`, then `npm run dev`. For the installable offline version use `npm run build && npm run preview`. Deploy the contents of `dist/` at the root of an HTTPS origin. Install through a supported browser after its service worker finishes caching the first load.
 
-Start a named experiment, enter a setup, log actions and annotations, then select **Save experiment** before closing or opening another notebook. Use Experiments to reopen, duplicate, import or export a JSON backup. Reports exports a plain-text history, not a scientific result.
+The app opens in **Laboratory** with a fresh manual ACh experiment. Enter stock concentration and administration volume in the left rack, inspect the final concentration, then **Add to organ bath → Record**. **Experimental Setup** shows the apparatus and profile settings; **Dilution Formula** shares the dosing inputs. Use **Save experiment** before closing or opening another notebook. **Notebooks** contains saved records and backup tools. **Resources** contains the reference libraries, reports, settings and historical dashboard. See the [workstation guide and implementation report](docs/INSTRUMENT-WORKSTATION.md).
 
 ## Desktop
 

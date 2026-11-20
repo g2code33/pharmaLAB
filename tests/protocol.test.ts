@@ -9,6 +9,7 @@ import {
   trialMetadata,
   csv,
   OPTION,
+  workstationPreset,
 } from "../src/simulation/ach/protocol";
 import { defaults, registry, corbett } from "../src/simulation/ach/protocols";
 import { create, valid } from "../src/simulation/core";
@@ -193,4 +194,44 @@ test("ascending and repeated non-cumulative protocols start each dose with excha
     if (schedule === "series") assert.ok(adds[1].nominalM > adds[0].nominalM);
     else assert.equal(adds[1].nominalM, adds[0].nominalM);
   }
+});
+
+test("physical boluses replay in order; reservoir exchange replaces volume without erasing the tissue state", () => {
+  const t = workstationPreset();
+  const p = {
+    ...t.plan,
+    schedule: "manual" as const,
+    initialVolumeMl: 9,
+    transfers: [
+      { kind: "add" as const, s: 0, stockM: 1e-4, volumeMl: 1 },
+      { kind: "add" as const, s: 0, stockM: 1e-4, volumeMl: 1 },
+      { kind: "exchange" as const, s: 10, nominalM: 2e-6 },
+      { kind: "exchange" as const, s: 20, nominalM: 0 },
+    ],
+  };
+  const points = sampleProtocol(p, 20);
+  assert.equal(points[0].volumeMl, 11);
+  near(points[0].nominalM, 2e-4 / 11);
+  assert.equal(points[0].commands?.length, 2);
+  assert.equal(points[10].volumeMl, 9);
+  assert.equal(points[10].nominalM, 2e-6);
+  assert.equal(points[20].nominalM, 0);
+  assert.ok(points[20].memory > 0);
+  assert.ok(points[20].relative > 0);
+  assert.deepEqual(points, sampleProtocol(JSON.parse(JSON.stringify(p)), 20));
+  assert.equal(
+    validTrial({ ...t, plan: p, elapsed: 20, recordFromS: -1 }),
+    false,
+  );
+  assert.equal(validTrial({ ...t, plan: p, elapsed: 1 }), false);
+  assert.equal(
+    validTrial({
+      ...t,
+      plan: {
+        ...p,
+        transfers: [{ s: 0, kind: "add", volumeMl: 0, stockM: 1e-4 }],
+      },
+    }),
+    false,
+  );
 });

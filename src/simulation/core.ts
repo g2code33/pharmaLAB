@@ -1,4 +1,4 @@
-import { OPTION, validTrial, type Trial } from "./ach/protocol";
+import { OPTION, WORKSTATION, validTrial, type Trial } from "./ach/protocol";
 import { sources } from "./ach/protocols";
 import { createRun, validRun, VERSION, type Run } from "./ach/run";
 import { tissues } from "../catalogue";
@@ -61,12 +61,13 @@ export function valid(x: any): x is Experiment {
     !!x &&
     x.schema === 1 &&
     (x.trial === undefined
-      ? x.version !== OPTION
-      : x.version === OPTION &&
+      ? x.version !== OPTION && x.version !== WORKSTATION
+      : (x.version === OPTION || x.version === WORKSTATION) &&
+        x.version === x.trial?.plan?.version &&
         !x.ach &&
         validTrial(x.trial) &&
         x.parameters?.length === 1 &&
-        x.parameters[0] === OPTION &&
+        x.parameters[0] === x.version &&
         x.model === tissues[0] &&
         x.datasets?.length === 1 &&
         x.datasets[0] === sources[(x.trial as Trial).plan.context].id) &&

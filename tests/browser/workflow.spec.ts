@@ -1,3 +1,4 @@
+import { resource } from "./navigation";
 import { test, expect } from "@playwright/test";
 test("workspace, local record and offline restart", async ({
   page,
@@ -5,7 +6,7 @@ test("workspace, local record and offline restart", async ({
 }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Laboratory dashboard" }),
+    page.getByRole("heading", { name: "Organ bath laboratory" }),
   ).toBeVisible();
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -27,7 +28,7 @@ test("workspace, local record and offline restart", async ({
   await expect(page.getByRole("status")).toContainText("saved locally");
   await context.setOffline(true);
   await page.reload();
-  await page.getByRole("button", { name: "Experiments", exact: true }).click();
+  await page.getByRole("button", { name: "Notebooks", exact: true }).click();
   await page.getByRole("button", { name: "Practical notebook" }).click();
   await expect(page.getByText(/Add drug: Acetylcholine/)).toBeVisible();
   for (const p of [
@@ -38,10 +39,7 @@ test("workspace, local record and offline restart", async ({
     "About PharmaLab",
     "Dashboard",
   ])
-    await page
-      .locator("aside")
-      .getByRole("button", { name: p, exact: true })
-      .click();
+    await resource(page, p);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>
@@ -49,7 +47,10 @@ test("workspace, local record and offline restart", async ({
     )
     .toBe(true);
   await page.getByLabel("Toggle navigation").click();
-  await page.locator("aside").getByText("Tissue Library").click();
+  await page
+    .getByRole("navigation", { name: "Workspace resources" })
+    .getByText("Tissue Library")
+    .click();
   await expect(
     page.getByRole("heading", { name: "Preparation catalogue" }),
   ).toBeVisible();

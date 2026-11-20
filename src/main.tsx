@@ -1,11 +1,16 @@
 import { Plot } from "./laboratory/ProtocolPlot";
 import { sampleProtocol } from "./simulation/ach/protocol";
 import { ProtocolBench } from "./laboratory/ProtocolBench";
-import { OPTION, preset, type Trial } from "./simulation/ach/protocol";
+import {
+  WORKSTATION,
+  workstationPreset,
+  preset,
+  type Trial,
+} from "./simulation/ach/protocol";
 import { sources } from "./simulation/ach/protocols";
 import { AChControls, EvidenceReplay } from "./laboratory/ACh";
 import { apply, type Run } from "./simulation/ach/run";
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
   LayoutDashboard,
@@ -17,7 +22,10 @@ import {
   FileText,
   Settings2,
   Info,
-  PanelLeft,
+  Menu,
+  Sun,
+  Moon,
+  ChevronDown,
   ChevronRight,
   ArrowRight,
   Plus,
@@ -53,6 +61,7 @@ import {
 } from "./simulation/core";
 import { get, put, desktop } from "./database/store";
 import "./style.css";
+import "./workstation.css";
 const pages = [
   "Dashboard",
   "Laboratory",
@@ -95,7 +104,7 @@ const defaults = {
 type Pref = typeof defaults;
 const pageFromHash = () =>
   pages.find((p) => p === decodeURIComponent(location.hash.slice(1))) ||
-  pages[0];
+  "Laboratory";
 function download(name: string, text: string, type = "application/json") {
   const u = URL.createObjectURL(new Blob([text], { type })),
     a = document.createElement("a");
@@ -103,6 +112,18 @@ function download(name: string, text: string, type = "application/json") {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(u), 1000);
+}
+function newProtocol(name: string) {
+  const e = create(name),
+    trial = workstationPreset();
+  delete e.ach;
+  return {
+    ...e,
+    trial,
+    version: trial.plan.version,
+    parameters: [trial.plan.version],
+    datasets: [sources[trial.plan.context].id],
+  };
 }
 function App() {
   const [openRevision, setOpenRevision] = useState(0);
@@ -112,14 +133,15 @@ function App() {
   const [page, P] = useState(pageFromHash),
     [menu, M] = useState(false),
     [all, A] = useState<Experiment[]>([]),
-    [exp, E] = useState<Experiment | null>(null),
+    [exp, E] = useState<Experiment | null>(() =>
+      newProtocol("Untitled experiment"),
+    ),
     [pref, F] = useState<Pref>(defaults),
     [ready, R] = useState(false),
     [msg, G] = useState(""),
     [modal, D] = useState(""),
     [busy, B] = useState(false),
     [closing, C] = useState(false),
-    [collapsed, Collapse] = useState(false),
     [input, I] = useState(""),
     [detail, H] = useState(""),
     [rec, S] = useState("Stopped"),
@@ -256,7 +278,7 @@ function App() {
         ? {
             ...old,
             ach: undefined,
-            version: OPTION,
+            version: trial.plan.version,
             trial,
             parameters: [trial.plan.version],
             datasets: [sources[trial.plan.context].id],
@@ -369,115 +391,134 @@ function App() {
     ));
   }
   return (
-    <div className={"shell " + (collapsed ? "collapsed" : "")}>
-      <aside inert={!!modal} className={menu ? "show" : ""}>
-        <div className="brand">
-          <span>
-            <FlaskConical />
-          </span>
-          <strong>
-            Pharma<span>Lab</span>
-          </strong>
-        </div>
-        <div className="navwrap">
-          {pages.map((p, i) => {
-            const Ic = icons[i];
-            return (
-              <React.Fragment key={p}>
-                {[0, 4, 7].includes(i) && (
-                  <label>
-                    {i === 0 ? "WORKSPACE" : i === 4 ? "RESEARCH" : "SYSTEM"}
-                  </label>
-                )}
-                <button
-                  className={p === page ? "active" : ""}
-                  title={p}
-                  aria-label={p}
-                  aria-current={page === p ? "page" : undefined}
-                  onClick={() => nav(p)}
-                >
-                  <Ic size={17} />
-                  <span>{p}</span>
-                  {p === page && <i className="activeDot" />}
-                </button>
-              </React.Fragment>
-            );
-          })}
-        </div>
-        <div className="local">
-          <span className="dockicon">
-            <Cpu size={18} />
-          </span>
-          <b>Local workstation</b>
-          <small>
-            PharmaLab <span>v{__BUILD__.version}</span>
-          </small>
-        </div>
-      </aside>
+    <div className="shell stationShell">
       <main inert={!!modal}>
-        <header>
+        <header className="stationHeader">
           <button
-            className="bare"
-            aria-label="Toggle navigation"
-            onClick={() =>
-              window.matchMedia("(max-width:800px)").matches
-                ? M(!menu)
-                : Collapse(!collapsed)
-            }
+            className="stationBrand"
+            onClick={() => nav("Laboratory")}
+            aria-label="PharmaLab laboratory"
           >
-            <PanelLeft size={17} />
+            <span>
+              <FlaskConical size={22} />
+            </span>
+            Pharma<b>Lab</b>
           </button>
-          <span className="divider" />
-          Workspace <ChevronRight size={13} />
-          <strong>{page}</strong>
-          <span className="topstatus">
-            <i /> Local session
+          <span className="brandSub">INSTRUMENT SUITE</span>
+          <nav aria-label="Primary navigation">
+            <button
+              className={page === "Laboratory" ? "current" : ""}
+              onClick={() => nav("Laboratory")}
+            >
+              <Activity size={15} />
+              Laboratory
+            </button>
+            <button
+              className={page === "Experiments" ? "current" : ""}
+              onClick={() => nav("Experiments")}
+            >
+              <BookOpen size={15} />
+              Notebooks
+            </button>
+            <button
+              aria-expanded={menu}
+              aria-label="Toggle navigation"
+              onClick={() => M(!menu)}
+            >
+              <Menu size={15} />
+              Resources
+              <ChevronDown size={13} />
+            </button>
+          </nav>
+          <span className="localChip">
+            <i />
+            {online ? "Local workspace" : "Offline workspace"}
           </span>
-          <span className="profile" title="Local PharmaLab session">
-            PL
-          </span>
+          <button
+            className="themeSwitch"
+            aria-label="Switch theme"
+            onClick={() => {
+              const next = {
+                ...pref,
+                Theme: pref.Theme === "Dark" ? "Light" : "Dark",
+              };
+              put("settings", next)
+                .then(() => F(next))
+                .catch(() => G("Preference could not be saved"));
+            }}
+          >
+            {pref.Theme === "Dark" ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          {menu && (
+            <div
+              className="resourceMenu"
+              role="navigation"
+              aria-label="Workspace resources"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") M(false);
+              }}
+            >
+              {pages.map((p, i) => {
+                const Ic = icons[i];
+                return (
+                  <button key={p} onClick={() => nav(p)}>
+                    <Ic size={16} />
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </header>
         <article key={page} data-page={page}>
-          <div className="eyebrow">
-            <span />{" "}
-            {page === "Dashboard"
-              ? "WORKSTATION  /  OVERVIEW"
-              : page === "Laboratory"
-                ? "EXPERIMENT WORKSPACE"
-                : "LOCAL WORKSPACE"}
-          </div>
-          <div className="title">
-            <h1 tabIndex={-1}>
-              {page === "Dashboard" ? "Laboratory dashboard" : page}
-            </h1>
-            {page === "Dashboard" ? (
-              <span className="date">
-                <CalendarDays size={14} />
-                {new Date().toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </span>
-            ) : page === "Experiments" ? (
-              newBtn
-            ) : null}
-          </div>
-          <p className="subtitle">
-            {
-              [
-                "A local workspace for experimental pharmacology.",
-                "Configure your preparation and document experimental actions.",
-                "Browse preparations and review model development status.",
-                "Explore planned compounds and their evidence status.",
-                "Manage experiment records stored on this device.",
-                "Review your experimental history and recording configuration.",
-                "Export a readable record of your local experiments.",
-                "Configure your local laboratory workspace.",
-                "An independent, offline-first virtual pharmacology laboratory.",
-              ][pages.indexOf(page)]
-            }
-          </p>
+          {!(
+            page === "Laboratory" &&
+            exp?.trial &&
+            mode === "Protocol simulation"
+          ) && (
+            <>
+              <div className="eyebrow">
+                <span />{" "}
+                {page === "Dashboard"
+                  ? "WORKSTATION  /  OVERVIEW"
+                  : page === "Laboratory"
+                    ? "EXPERIMENT WORKSPACE"
+                    : "LOCAL WORKSPACE"}
+              </div>
+              <div className="title">
+                <h1 tabIndex={-1}>
+                  {page === "Dashboard" ? "Laboratory dashboard" : page}
+                </h1>
+                {page === "Dashboard" ? (
+                  <span className="date">
+                    <CalendarDays size={14} />
+                    {new Date().toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                ) : page === "Experiments" ? (
+                  newBtn
+                ) : null}
+              </div>
+              <p className="subtitle">
+                {
+                  [
+                    "A local workspace for experimental pharmacology.",
+                    "Configure your preparation and document experimental actions.",
+                    "Browse preparations and review model development status.",
+                    "Explore planned compounds and their evidence status.",
+                    "Manage experiment records stored on this device.",
+                    "Review your experimental history and recording configuration.",
+                    "Export a readable record of your local experiments.",
+                    "Configure your local laboratory workspace.",
+                    "An independent, offline-first virtual pharmacology laboratory.",
+                  ][pages.indexOf(page)]
+                }
+              </p>
+            </>
+          )}
           {page === "Dashboard" && (
             <>
               <section className="hero">
@@ -641,35 +682,37 @@ function App() {
           )}
           {page === "Laboratory" && (
             <>
-              <div className="toolbar">
-                <strong>{exp?.name || "Preparation workspace"}</strong>
-                <label>
-                  Workspace mode
-                  <select
-                    value={mode}
-                    onChange={(e) => setMode(e.target.value)}
-                  >
-                    <option disabled={!!exp?.trial}>Simulation</option>
-                    <option>Protocol simulation</option>
-                    <option>Evidence replay</option>
-                  </select>
-                </label>
-                {newBtn}
-                {exp && (
-                  <>
-                    <button
-                      onClick={() =>
-                        notify(save(exp), "Experiment saved locally")
-                      }
+              {!(exp?.trial && mode === "Protocol simulation") && (
+                <div className="toolbar">
+                  <strong>{exp?.name || "Preparation workspace"}</strong>
+                  <label>
+                    Workspace mode
+                    <select
+                      value={mode}
+                      onChange={(e) => setMode(e.target.value)}
                     >
-                      Save experiment
-                    </button>
-                    <button onClick={() => dialog("Reset experiment")}>
-                      Reset experiment
-                    </button>
-                  </>
-                )}
-              </div>
+                      <option disabled={!!exp?.trial}>Simulation</option>
+                      <option>Protocol simulation</option>
+                      <option>Evidence replay</option>
+                    </select>
+                  </label>
+                  {newBtn}
+                  {exp && (
+                    <>
+                      <button
+                        onClick={() =>
+                          notify(save(exp), "Experiment saved locally")
+                        }
+                      >
+                        Save experiment
+                      </button>
+                      <button onClick={() => dialog("Reset experiment")}>
+                        Reset experiment
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               {mode === "Protocol simulation" ? (
                 exp?.trial ? (
                   <ProtocolBench
@@ -678,6 +721,31 @@ function App() {
                     all={all}
                     change={updateTrial}
                     download={download}
+                    newRun={() => dialog("New experiment")}
+                    save={() => notify(save(exp), "Experiment saved locally")}
+                    reset={() => dialog("Reset experiment")}
+                    annotate={() => dialog("Add annotation")}
+                    setField={(key, value) =>
+                      E((old) =>
+                        old
+                          ? {
+                              ...old,
+                              conditions: { ...old.conditions, [key]: value },
+                            }
+                          : old,
+                      )
+                    }
+                    setScale={(v) =>
+                      E((old) =>
+                        old
+                          ? {
+                              ...old,
+                              recording: { ...old.recording, scale: `${v} s` },
+                            }
+                          : old,
+                      )
+                    }
+                    notes={(v) => E({ ...exp, notes: v })}
                   />
                 ) : (
                   <section className="panel">
@@ -690,7 +758,7 @@ function App() {
                       source-constrained; kinetics are not validated.
                     </p>
                     {exp?.ach && !exp.ach.history.length ? (
-                      <button onClick={() => updateTrial(preset())}>
+                      <button onClick={() => updateTrial(workstationPreset())}>
                         Configure protocol
                       </button>
                     ) : (
@@ -840,7 +908,7 @@ function App() {
                   )}
                 </section>
               )}
-              {exp && (
+              {exp && !(exp.trial && mode === "Protocol simulation") && (
                 <section className="panel">
                   <h2>Experiment notebook</h2>
                   <label>
@@ -1091,7 +1159,11 @@ function App() {
                       scale={record?.recording.scale}
                     />
                   );
-                const points = sampleProtocol(t.plan, t.elapsed, t.washAt),
+                const points = sampleProtocol(
+                    t.plan,
+                    t.elapsed,
+                    t.washAt,
+                  ).slice(t.recordFromS ?? 0),
                   ys = points.map((q) => q.forceG ?? q.relative * 100);
                 return (
                   <>
@@ -1246,19 +1318,18 @@ function App() {
               B(true);
               try {
                 if (modal === "New experiment") {
-                  const v = create(input);
-                  if (newMode === "Protocol simulation") {
-                    const trial = preset();
-                    v.trial = trial;
-                    delete v.ach;
-                    v.version = OPTION;
-                    v.parameters = [OPTION];
-                    v.datasets = [sources[trial.plan.context].id];
-                  }
+                  const v =
+                    newMode === "Protocol simulation"
+                      ? newProtocol(input)
+                      : create(input);
                   await save(v);
                   open(v);
                 } else if (modal === "Add annotation") {
-                  event("Annotation: " + input);
+                  event(
+                    (exp?.trial ? `[${exp.trial.elapsed} s] ` : "") +
+                      "Annotation: " +
+                      input,
+                  );
                 } else if (exp) {
                   const v = {
                     ...create(exp.name),
@@ -1267,7 +1338,11 @@ function App() {
                     model: exp.model,
                     version: exp.version,
                     ...(exp.trial
-                      ? { trial: preset(exp.trial.plan.context) }
+                      ? {
+                          trial: (exp.version === WORKSTATION
+                            ? workstationPreset
+                            : preset)(exp.trial.plan.context),
+                        }
                       : {}),
                     ...(!exp.ach
                       ? {

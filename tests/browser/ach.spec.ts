@@ -3,7 +3,8 @@ test("evidence comparison is not a simulated recording; target dose uses current
   page,
 }) => {
   await page.goto("/#Laboratory");
-  await page.getByLabel("Workspace mode").selectOption("Evidence replay");
+  await page.getByText("Notebook, analysis & exports", { exact: true }).click();
+  await page.getByText("Source evidence", { exact: true }).click();
   await page
     .getByLabel("Compare preparations")
     .selectOption("Longitudinal strip");

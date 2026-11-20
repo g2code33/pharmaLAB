@@ -1,3 +1,4 @@
+import { resource } from "./navigation";
 import { test, expect } from "@playwright/test";
 test("instrument controls, safe reset and display preferences", async ({
   page,
@@ -7,9 +8,8 @@ test("instrument controls, safe reset and display preferences", async ({
   page.on("console", (e) => {
     if (e.type() === "error") errors.push(e.text());
   });
-  await page.goto("/");
-  const nav = (n: string) =>
-    page.locator("aside").getByRole("button", { name: n, exact: true }).click();
+  await page.goto("/#Dashboard");
+  const nav = (n: string) => resource(page, n);
   await page.getByRole("button", { name: /Drug reference/ }).click();
   await page.getByLabel("Find a compound").fill("hist");
   await expect(page.locator(".listitem")).toHaveCount(1);
@@ -54,7 +54,7 @@ test("instrument controls, safe reset and display preferences", async ({
   await page.getByLabel("Reduced motion").selectOption("Off");
   await page.getByLabel("Graphics quality").selectOption("Low");
   await expect(page.locator("html")).toHaveAttribute("data-motion", "off");
-  await page.getByLabel("Theme").selectOption("Dark");
+  await page.getByRole("combobox", { name: /^Theme/ }).selectOption("Dark");
   await nav("Laboratory");
   for (const width of [1440, 1024, 768, 360]) {
     await page.setViewportSize({ width, height: 820 });

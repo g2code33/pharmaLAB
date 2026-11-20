@@ -12,8 +12,14 @@ import {
 import { hill, mix, volumeForTarget } from "./math";
 import { instrument, measure, stableBath } from "./dynamics";
 export const OPTION = "GP-ACH-001/option-a-1" as const;
+export const WORKSTATION = "GP-ACH-001/option-a-2" as const;
+export type Transfer =
+  | { s: number; kind: "add"; stockM: number; volumeMl: number }
+  | { s: number; kind: "exchange"; nominalM: number };
 export interface Plan {
-  version: typeof OPTION;
+  transfers?: Transfer[];
+  initialVolumeMl?: number;
+  version: typeof OPTION | typeof WORKSTATION;
   context: Context;
   manual?: DoseEvent[];
   schedule: Schedule;
@@ -22,6 +28,9 @@ export interface Plan {
   knobs: Knobs;
 }
 export interface Trial {
+  reservoirM?: number;
+  recordFromS?: number;
+  solutionRecipe?: "mplm" | "intact";
   comparison?: Comparison;
   plan: Plan;
   elapsed: number;
@@ -43,12 +52,28 @@ export function preset(context: Context = "mplm"): Trial {
     washAt: null,
   };
 }
+/** New records support measured-volume commands; historical presets retain their reader. */
+export function workstationPreset(context: Context = "mplm"): Trial {
+  const t = preset(context);
+  return {
+    ...t,
+    plan: { ...t.plan, version: WORKSTATION, schedule: "manual" },
+  };
+}
 export function validTrial(value: unknown): value is Trial {
   const t = value as Trial,
     p = t?.plan;
   return (
     !!p &&
-    p.version === OPTION &&
+    (p.version === WORKSTATION ||
+      (p.version === OPTION &&
+        [
+          p.transfers,
+          p.initialVolumeMl,
+          t.solutionRecipe,
+          t.reservoirM,
+          t.recordFromS,
+        ].every((v) => v === undefined))) &&
     Object.hasOwn(sources, p.context) &&
     Object.hasOwn(schedules, p.schedule) &&
     (t.comparison === undefined || validComparison(t.comparison, p.context)) &&
@@ -71,6 +96,44 @@ export function validTrial(value: unknown): value is Trial {
             (!i || events[i - 1].s < e.s) &&
             (e.targetM === 0 || e.targetM === p.doseM) &&
             (i === 0 ? e.targetM > 0 : events[i - 1].targetM !== e.targetM),
+        ))) &&
+    (t.solutionRecipe === undefined ||
+      t.solutionRecipe === "mplm" ||
+      t.solutionRecipe === "intact") &&
+    (t.recordFromS === undefined ||
+      (Number.isInteger(t.recordFromS) &&
+        t.recordFromS >= 0 &&
+        t.recordFromS < p.durationS)) &&
+    (t.reservoirM === undefined ||
+      (Number.isFinite(t.reservoirM) &&
+        t.reservoirM >= 0 &&
+        t.reservoirM <= 1e-3)) &&
+    (p.initialVolumeMl === undefined ||
+      (Number.isFinite(p.initialVolumeMl) &&
+        p.initialVolumeMl >= 1 &&
+        p.initialVolumeMl <= 100)) &&
+    (p.transfers === undefined ||
+      (p.schedule === "manual" &&
+        Array.isArray(p.transfers) &&
+        p.transfers.length <= 7201 &&
+        p.transfers.every(
+          (e, i, a) =>
+            e &&
+            Number.isInteger(e.s) &&
+            e.s >= 0 &&
+            e.s <= t.elapsed &&
+            (!i || e.s >= a[i - 1].s) &&
+            (e.kind === "exchange"
+              ? Number.isFinite(e.nominalM) &&
+                e.nominalM >= 0 &&
+                e.nominalM <= 1e-3
+              : e.kind === "add" &&
+                Number.isFinite(e.stockM) &&
+                e.stockM >= 1e-12 &&
+                e.stockM <= 1 &&
+                Number.isFinite(e.volumeMl) &&
+                e.volumeMl >= 1e-6 &&
+                e.volumeMl <= 100),
         ))) &&
     Number.isInteger(t.elapsed) &&
     t.elapsed >= 0 &&
@@ -141,6 +204,7 @@ export interface Point {
   memory: number;
   forceG: number | null;
   event: string;
+  commands?: string[];
 }
 interface Tissue {
   phasic: number;
@@ -209,7 +273,8 @@ export function sampleProtocol(
   if (!validTrial({ plan: p, elapsed: end, washAt, stopped: false }))
     throw Error("Invalid protocol or sampling window");
   const events = new Map(schedule(p).map((e) => [e.s, e.targetM]));
-  const initial = sources[p.context].volumeMl;
+  const initial = p.initialVolumeMl ?? sources[p.context].volumeMl;
+  let nextTransfer = 0;
   let bath = { volumeMl: Number(initial), nominalM: 0 },
     t = fresh();
   const out: Point[] = [];
@@ -229,6 +294,19 @@ export function sampleProtocol(
       const v = volumeForTarget(bath, stock, target);
       bath = mix(bath, stock, v);
       event = `add ${v} mL at ${stock} M`;
+    }
+    // Physical boluses and full-volume exchanges use the same bath as scheduled events.
+    const commands = event ? [event] : [];
+    while (p.transfers?.[nextTransfer]?.s === s) {
+      const op = p.transfers[nextTransfer++];
+      if (op.kind === "add") {
+        bath = mix(bath, op.stockM, op.volumeMl);
+        event = `add ${op.volumeMl} mL at ${op.stockM} M`;
+      } else {
+        bath = { volumeMl: initial, nominalM: op.nominalM };
+        event = op.nominalM === 0 ? "wash" : `exchange at ${op.nominalM} M`;
+      }
+      commands.push(event);
     }
     const d = hill(
       stableBath.tissueConcentration(bath.nominalM, 0),
@@ -250,6 +328,7 @@ export function sampleProtocol(
         p.knobs.scaleG > 0
           ? measure(p.knobs.preloadG + relative * p.knobs.scaleG, instrument, s)
           : null,
+      ...(commands.length > 1 ? { commands } : {}),
       event,
     });
     t = model.advance(t, d, p.knobs);
@@ -270,11 +349,13 @@ export function trialMetadata(t: Trial, id: string, date: string) {
   return {
     experimentId: id,
     created: date,
-    version: OPTION,
+    version: t.plan.version,
     species: "Cavia porcellus",
     tissue: "ileum",
     agonist: "ACh",
     context: sources[t.plan.context],
+    setupSolution: sources[t.solutionRecipe ?? t.plan.context].solution,
+    solutionEffect: "Setup metadata only. No ion-specific response model.",
     protocol: schedules[t.plan.schedule],
     trial: t,
     parameters: registry(t.plan.context, t.plan.knobs),
@@ -296,8 +377,10 @@ export function trialMetadata(t: Trial, id: string, date: string) {
       percent: "percent of static Hill drive",
       logM: "log10(mol/L)",
     },
-    stockM: t.plan.doseM * 100,
-    stockStatus: "ASSUMED: protocol stock selected for mass balance",
+    stockM: t.plan.transfers?.length ? null : t.plan.doseM * 100,
+    stockStatus: t.plan.transfers?.length
+      ? "See individual physical transfer records"
+      : "ASSUMED: protocol stock selected for mass balance",
     referenceFit:
       "No verified point series; RMSE, slope CI and residuals unavailable",
   };
@@ -305,11 +388,14 @@ export function trialMetadata(t: Trial, id: string, date: string) {
 export function csv<T extends object>(metadata: object, rows: T[]) {
   const quote = (x: unknown) =>
     '"' + String(x ?? "").replaceAll('"', '""') + '"';
-  const keys = Object.keys(rows[0] ?? {});
+  const keys = [...new Set(rows.flatMap((r) => Object.keys(r)))];
   return [
     [...keys, "metadata_json"].map(quote).join(","),
     ...rows.map((r, i) =>
-      [...Object.values(r), i === 0 ? JSON.stringify(metadata) : ""]
+      [
+        ...keys.map((key) => r[key as keyof T]),
+        i === 0 ? JSON.stringify(metadata) : "",
+      ]
         .map(quote)
         .join(","),
     ),

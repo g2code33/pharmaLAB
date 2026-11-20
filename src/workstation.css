@@ -1,0 +1,842 @@
+/* Instrument skin: local system fonts, no remote assets. */
+html {
+  --bg: #f4f6f3;
+  --card: #fff;
+  --ink: #192e29;
+  --muted: #62736b;
+  --edge: #d7dfd9;
+  --soft: #edf3ef;
+  --accent: #17614d;
+  --tint: #edf6f0;
+  --grid: #d4dfd6;
+  --scope: #f8faf6;
+  --micro: #557466;
+}
+html[data-theme="Dark"] {
+  --bg: #15201d;
+  --card: #202d28;
+  --ink: #edf3ed;
+  --muted: #b2c4b8;
+  --soft: #2a3b32;
+  --edge: #3b5045;
+  --accent: #9dd8b9;
+  --tint: #273e31;
+  --grid: #3e5045;
+  --scope: #19251f;
+  --micro: #b5cdb9;
+}
+.stationShell {
+  display: block;
+}
+.stationHeader {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  height: 61px;
+  background: #102e26;
+  color: #d3e2d8;
+  padding: 0 clamp(16px, 3vw, 48px);
+  gap: 18px;
+  border-bottom: 2px solid #a99c66;
+}
+.stationHeader button {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  border-radius: 5px;
+}
+.stationHeader button:hover:not(:disabled) {
+  background: #244c3e;
+}
+.stationBrand {
+  font-size: 23px;
+  letter-spacing: -1px;
+  padding: 0;
+  gap: 0;
+  color: white !important;
+}
+.stationBrand b {
+  color: #b9d5bc;
+  font-weight: 500;
+}
+.stationBrand > span {
+  display: grid;
+  place-items: center;
+  background: #c6dfbe;
+  color: #194b37;
+  border-radius: 7px;
+  width: 34px;
+  height: 34px;
+  margin-right: 10px;
+}
+.brandSub,
+.micro,
+.overline,
+.localChip,
+.statePill,
+.scopeLegend small {
+  font: 600 10px/1.4 var(--mono);
+  letter-spacing: 1.3px;
+}
+.brandSub {
+  letter-spacing: 1.6px;
+  padding-left: 17px;
+  border-left: 1px solid #486156;
+  color: #b3c7b7;
+}
+.stationHeader nav {
+  display: flex;
+  gap: 4px;
+  margin: auto;
+}
+.stationHeader nav button {
+  font-size: 13px;
+  padding: 9px 12px;
+}
+.stationHeader nav .current {
+  background: #2b4d40;
+  color: white;
+}
+.localChip,
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.localChip i,
+.statePill i,
+.micro i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a4d6aa;
+  display: inline-block;
+}
+.themeSwitch {
+  border-left: 1px solid #456053 !important;
+  border-radius: 0 !important;
+}
+.resourceMenu {
+  position: absolute;
+  right: 5%;
+  top: 54px;
+  padding: 8px;
+  display: grid;
+  background: #16372d;
+  border: 1px solid #486154;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px #10271c26;
+}
+.resourceMenu button {
+  justify-content: start;
+}
+.stationTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0 24px;
+}
+.stationTitle h1 {
+  font:
+    500 clamp(30px, 3vw, 44px) / 1.1 Georgia,
+    serif;
+  letter-spacing: -1.7px;
+  margin: 6px 0;
+}
+.stationTitle p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.stationTitle p i {
+  margin: 0 6px;
+  color: #a7b2a8;
+}
+.overline,
+.micro {
+  color: var(--micro);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.overline span {
+  width: 21px;
+  height: 2px;
+  background: #aa9252;
+}
+.instrumentLayout {
+  display: grid;
+  grid-template-columns: 274px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.controlRack,
+.recorderCard,
+.stationCard,
+.journal,
+.utility,
+.apparatusTile {
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 2px 4px #15362305;
+}
+.controlRack {
+  position: sticky;
+  top: 76px;
+  max-height: calc(100dvh - 92px);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #b8c7bb transparent;
+}
+.rackHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 17px 18px;
+  background: #204839;
+  color: #f4f8f0;
+  font-size: 14px;
+}
+.ctrlGroup {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--edge);
+  border-radius: 0;
+  padding: 0;
+}
+.ctrlGroup:last-child {
+  border: 0;
+}
+.ctrlGroup summary,
+.utility > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  list-style: none;
+}
+.ctrlGroup summary {
+  padding: 14px 17px;
+}
+.ctrlGroup summary > svg:first-child,
+.utility > summary svg {
+  color: var(--accent);
+}
+.ctrlGroup summary > svg:last-child {
+  margin-left: auto;
+  transition: transform 0.18s;
+}
+.ctrlGroup[open] summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.groupBody {
+  padding: 0 17px 17px;
+  display: grid;
+  gap: 9px;
+}
+.instrument label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 550;
+}
+.instrument label input:not([type="radio"]),
+.instrument select,
+.instrument textarea {
+  display: block;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 4px 0 0;
+  width: 100%;
+  min-width: 0;
+  font-size: 13px;
+}
+.instrument summary:focus-visible {
+  outline: 2px solid #a98c44;
+  outline-offset: -3px;
+}
+.instrument small,
+.instrument details p {
+  color: var(--muted);
+}
+.groupBody p {
+  margin: 0;
+  font-size: 12px;
+}
+.dual {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 8px;
+}
+.wide {
+  width: 100%;
+}
+.drugSwitch {
+  display: flex;
+  padding: 3px;
+  border-radius: 6px;
+  background: var(--soft);
+  gap: 1px;
+}
+.drugSwitch button {
+  padding: 5px 1px;
+  flex: 1;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 11px;
+  color: var(--muted);
+}
+.drugSwitch button[aria-pressed="true"] {
+  background: var(--card);
+  border-color: var(--edge);
+  color: var(--accent);
+  box-shadow: 0 1px 2px #12392010;
+}
+.dosePreview {
+  padding: 9px 10px;
+  background: var(--tint);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--accent);
+}
+.dosePreview b {
+  font: 600 13px var(--mono);
+}
+.greenBtn,
+.greenBtn:not(:disabled):hover {
+  background: #21674f;
+  color: white;
+  border-color: #21674f;
+}
+.greenBtn:not(:disabled):hover {
+  background: #15553f;
+}
+.mobileControls {
+  display: none;
+}
+.workArea {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+.stationTabs {
+  display: flex;
+  gap: 15px;
+  border-bottom: 1px solid var(--edge);
+}
+.stationTabs button {
+  padding: 8px 6px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+}
+.stationTabs button[aria-pressed="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.recorderCard {
+  overflow: hidden;
+}
+.recHead,
+.sectionHead,
+.transport,
+.scopeLegend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.recHead {
+  padding: 18px 21px 12px;
+}
+.recHead h2,
+.stationCard h2 {
+  margin: 4px 0 0;
+  font: 600 23px/1.2 system-ui;
+  letter-spacing: -0.8px;
+}
+.micro i {
+  background: #45916d;
+}
+.statePill {
+  padding: 4px 9px;
+  background: var(--soft);
+  color: var(--muted);
+  border: 1px solid var(--edge);
+  border-radius: 20px;
+}
+.statePill i {
+  background: #9a8d5b;
+}
+.readingStrip {
+  margin: 0 21px;
+  padding: 13px 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+}
+.readingStrip > div {
+  padding-left: 15px;
+  border-left: 1px solid var(--edge);
+}
+.readingStrip > div:first-child {
+  border: none;
+  padding-left: 0;
+}
+.readingStrip small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.readingStrip b {
+  font: 500 21px var(--mono);
+  letter-spacing: -1px;
+  display: block;
+  margin-top: 3px;
+}
+.readingStrip em {
+  font: normal 11px var(--mono);
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.scope {
+  position: relative;
+  margin: 14px 21px 0;
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.scopeUnit {
+  margin: 0 0 6px 34px;
+}
+.graticule {
+  position: relative;
+  margin-left: 34px;
+  height: clamp(180px, 24vh, 300px);
+  background-color: var(--scope);
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to top, var(--grid) 1px, transparent 1px);
+  background-size:
+    10% 100%,
+    100% 12.5%;
+  border: 1px solid var(--grid);
+  overflow: hidden;
+}
+.graticule > svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+.yTicks {
+  position: absolute;
+  top: 17px;
+  left: 0;
+  bottom: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 29px;
+  text-align: right;
+}
+.xTicks {
+  margin: 5px 0 0 34px;
+  display: flex;
+  justify-content: space-between;
+}
+.axisTime {
+  text-align: center;
+  margin-top: 2px;
+}
+.scopeEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink);
+  font: 13px system-ui;
+}
+.scopeEmpty span {
+  background: var(--card);
+  color: var(--accent);
+  border: 1px solid var(--edge);
+  padding: 7px 9px;
+  border-radius: 9px;
+  display: grid;
+  margin-bottom: 4px;
+}
+.scopeEmpty small,
+.scopeEmpty b {
+  background: var(--scope);
+  padding: 1px 4px;
+}
+.scopeMark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed #a18445;
+  color: var(--accent);
+  font-size: 10px;
+  max-width: 130px;
+  overflow: hidden;
+}
+.scopeLegend {
+  margin: 10px 21px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.scopeLegend span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.scopeLegend span i {
+  width: 15px;
+  border-top: 2px solid #25836a;
+}
+.scopeLegend small i {
+  font-style: normal;
+  color: #a3aba1;
+}
+.transport {
+  justify-content: flex-start;
+  border-top: 1px solid var(--edge);
+  padding: 12px 17px;
+  background: var(--scope);
+  flex-wrap: wrap;
+}
+.transport button {
+  padding: 7px 10px;
+}
+.zoomBar {
+  display: flex;
+  margin-left: auto;
+}
+.zoomBar button {
+  padding: 7px;
+  border-radius: 4px;
+}
+.belowScope {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 14px;
+}
+.journal,
+.stationCard,
+.utility {
+  padding: 16px 19px;
+}
+.sectionHead h3 {
+  margin: 4px 0 9px;
+}
+.sectionHead button {
+  border: 0;
+  color: var(--accent);
+  padding: 4px;
+}
+.logEntry {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 0;
+  font-size: 12px;
+  border-top: 1px solid var(--edge);
+  overflow-wrap: anywhere;
+}
+.logEntry time {
+  font: 11px var(--mono);
+  color: var(--muted);
+}
+.apparatusTile,
+.apparatusTile:not(:disabled):hover {
+  background: #193b30;
+  color: #edf6ec;
+  position: relative;
+  overflow: hidden;
+  display: block;
+  text-align: left;
+  padding: 14px 16px;
+  min-height: 138px;
+}
+.apparatusTile .micro {
+  color: #aec8b6;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+.apparatusTile > b {
+  display: block;
+  position: relative;
+  z-index: 1;
+  width: 44%;
+  font:
+    500 19px/1.2 Georgia,
+    serif;
+  margin-top: 10px;
+}
+.apparatusTile .bath-svg {
+  position: absolute;
+  width: 76%;
+  height: 135%;
+  max-height: none;
+  right: -6%;
+  bottom: -22%;
+  background: none;
+  border: none;
+}
+.utility > summary {
+  font-size: 12px;
+}
+.utility > summary:after {
+  content: "+";
+  margin-left: auto;
+}
+.utility[open] > summary:after {
+  content: "−";
+}
+.utility details,
+.stationCard details {
+  margin: 12px 0;
+}
+.utility > summary + * {
+  margin-top: 15px;
+}
+.stationCard h2 {
+  margin-bottom: 15px;
+}
+.stationCard > label,
+.stationCard > .dual {
+  max-width: 460px;
+  margin: 9px 0;
+}
+.setupBath {
+  background: #19382c;
+  border-radius: 8px;
+  margin: 12px 0;
+  text-align: center;
+}
+.setupBath .bath-svg {
+  height: 190px;
+  width: 100%;
+}
+.setupBath.expanded .bath-svg {
+  height: min(44vw, 430px);
+  max-height: none;
+}
+.formula {
+  padding: 18px;
+  background: var(--tint);
+  color: var(--accent);
+  font:
+    18px Georgia,
+    serif;
+  border-radius: 6px;
+}
+.stationCard .fields,
+.utility .fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 10px;
+}
+.stationCard a {
+  color: var(--accent);
+}
+.instrument fieldset {
+  border: 1px solid var(--edge);
+}
+.stationShell article {
+  padding-top: 19px;
+}
+.stationShell footer {
+  margin-top: 16px;
+}
+.stationShell header {
+  position: sticky;
+}
+.stationShell .stationHeader button {
+  white-space: nowrap;
+}
+@media (max-width: 1050px) {
+  .brandSub {
+    display: none;
+  }
+  .instrumentLayout {
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 14px;
+  }
+  .stationTabs {
+    gap: 7px;
+  }
+  .stationTabs button {
+    font-size: 12px;
+  }
+  .readingStrip > div {
+    padding-left: 7px;
+  }
+  .belowScope {
+    grid-template-columns: 1.3fr 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .stationHeader {
+    height: auto;
+    min-height: 54px;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 7px 12px;
+  }
+  .stationBrand {
+    font-size: 18px;
+  }
+  .stationBrand > span {
+    width: 27px;
+    height: 29px;
+    margin-right: 5px;
+  }
+  .stationHeader nav {
+    margin-left: auto;
+    margin-right: 0;
+    gap: 0;
+  }
+  .stationHeader nav button {
+    padding: 7px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .localChip,
+  .stationHeader nav button svg,
+  .brandSub {
+    display: none;
+  }
+  .stationHeader .themeSwitch {
+    padding: 6px;
+  }
+  .stationShell article {
+    padding: 14px 12px;
+  }
+  .stationTitle {
+    padding: 0 0 13px;
+  }
+  .stationTitle h1 {
+    font-size: 29px;
+  }
+  .stationTitle p {
+    font-size: 11px;
+  }
+  .stationTitle > button {
+    font-size: 0;
+    gap: 0;
+  }
+  .mobileControls {
+    display: flex;
+    margin-bottom: 10px;
+  }
+  .instrumentLayout {
+    display: block;
+  }
+  .controlRack {
+    display: none;
+    position: static;
+    max-height: 60dvh;
+    margin-bottom: 12px;
+  }
+  .controlRack.rackOpen {
+    display: block;
+  }
+  .graticule {
+    height: 200px;
+  }
+  .recHead,
+  .journal,
+  .utility,
+  .stationCard {
+    padding: 12px;
+  }
+  .readingStrip,
+  .scope,
+  .scopeLegend {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+  .readingStrip b {
+    font-size: 16px;
+  }
+  .readingStrip small svg {
+    display: none;
+  }
+  .readingStrip small {
+    font-size: 10px;
+  }
+  .transport {
+    gap: 3px;
+    padding: 8px;
+  }
+  .transport button {
+    padding: 7px;
+  }
+  .belowScope {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 6px;
+  }
+  .stationTabs button {
+    padding: 7px 3px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .zoomBar {
+    margin-left: 0;
+  }
+  .apparatusTile > b {
+    font-size: 15px;
+  }
+  .stationTitle .overline {
+    font-size: 9px;
+  }
+  .resourceMenu {
+    right: 12px;
+  }
+  .recHead h2 {
+    font-size: 21px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:after,
+  *:before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+/* Preserve full-width controls on mobile; the old dashboard's .wide helper hides decorations. */
+.instrument .wide {
+  display: inline-flex;
+}
+@media (min-width: 761px) and (max-width: 900px) {
+  .stationHeader .localChip {
+    display: none;
+  }
+  .stationHeader {
+    gap: 8px;
+  }
+}

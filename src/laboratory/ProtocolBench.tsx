@@ -1,119 +1,225 @@
-import { Plot } from "./ProtocolPlot";
-import { CurveReview } from "./CurveReview";
-import { useEffect, useMemo, useState } from "react";
-import { Bath } from "./Bath";
+import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import {
-  csv,
-  exposureMetrics,
-  doseCurve,
-  preset,
+  Activity,
+  Beaker,
+  ChartNoAxesCombined,
+  ChevronDown,
+  Droplets,
+  ListTree,
+  Maximize2,
+  Minus,
+  Pause,
+  Pipette,
+  Play,
+  Plus,
+  RotateCcw,
+  Save,
+  Settings2,
+  SlidersHorizontal,
+  Square,
+  Thermometer,
+  Timer,
+  Waves,
+  Zap,
+  Calculator,
+  Layers3,
+  NotebookPen,
+} from "lucide-react";
+import { ProtocolNotebook } from "./ProtocolNotebook";
+import { TraceScreen, stamp } from "./TraceScreen";
+
+import { Bath } from "./Bath";
+
+import {
+  WORKSTATION,
+  workstationPreset,
   sampleProtocol,
   schedule,
-  trialMetadata,
   validTrial,
   type Trial,
-  type Point,
+  type Transfer,
 } from "../simulation/ach/protocol";
 import {
-  fields,
-  registry,
   sources,
   schedules,
   type Context,
-  type Knobs,
   type Schedule,
 } from "../simulation/ach/protocols";
-import { molar, pEC50 } from "../simulation/ach/math";
-import type { Experiment } from "../simulation/core";
-type Download = (filename: string, data: string, type?: string) => void;
+import { molar, mix } from "../simulation/ach/math";
+import { tissues, drugs, type Experiment } from "../simulation/core";
 const fmt = (x: number) => Number(x.toPrecision(4)).toString();
+type DownloadFn = (name: string, data: string, type?: string) => void;
+function Group({
+  icon: Icon,
+  name,
+  children,
+  open = false,
+}: {
+  icon: typeof Activity;
+  name: string;
+  children: ReactNode;
+  open?: boolean;
+}) {
+  return (
+    <details className="ctrlGroup" open={open}>
+      <summary>
+        <Icon size={16} />
+        {name}
+        <ChevronDown size={14} />
+      </summary>
+      <div className="groupBody">{children}</div>
+    </details>
+  );
+}
 export function ProtocolBench({
   exp,
   all,
   change,
   download,
+  newRun,
+  save,
+  reset,
+  annotate,
+  notes,
+  setField,
+  setScale,
 }: {
   exp: Experiment;
   all: Experiment[];
   change: (v: Trial) => void;
-  download: Download;
+  download: DownloadFn;
+  newRun: () => void;
+  save: () => void;
+  reset: () => void;
+  annotate: () => void;
+  notes: (s: string) => void;
+  setField: (key: string, value: string) => void;
+  setScale: (seconds: number) => void;
 }) {
   const t = exp.trial!,
     p = t.plan,
     k = p.knobs,
     source = sources[p.context];
   const [playing, play] = useState(false),
-    [speed, speedTo] = useState(10),
-    [span, zoom] = useState(180),
-    [magnify, magnification] = useState(false),
+    [speed, speedTo] = useState(1),
+    [start, pan] = useState<number | null>(null),
     [inspect, seek] = useState<number | null>(null),
     [compare, selectComparison] = useState(""),
     [error, report] = useState(""),
-    [unit, setUnit] = useState<"M" | "mM" | "µM" | "nM">("µM");
-  const locked = t.elapsed > 0 || !!p.manual?.length || playing || t.stopped;
-  // Simulation time is deterministic; navigation/closing never synthesises missed samples.
+    [drugTab, drugTo] = useState("Agonist"),
+    [tab, tabTo] = useState("Chart"),
+    [drawer, show] = useState(false),
+    [reserve, reserveTo] = useState("1"),
+    [expanded, expand] = useState(false);
+  const span = parseInt(exp.recording.scale) || 60,
+    zoom = setScale,
+    stock = exp.conditions.stock ?? "0.1",
+    volume = exp.conditions.volume ?? "0.03",
+    unit = (exp.conditions.stockUnit ?? "mM") as "M" | "mM" | "µM" | "nM";
+  const recordFrom = t.recordFromS ?? 0;
+  const locked =
+    t.elapsed > 0 ||
+    !!p.manual?.length ||
+    !!p.transfers?.length ||
+    playing ||
+    t.stopped;
+  const onTick = useRef(change);
+  useEffect(() => {
+    onTick.current = change;
+  }, [change]);
   useEffect(() => {
     if (!playing) return;
     if (t.stopped || t.elapsed >= p.durationS) {
       play(false);
       return;
     }
-    const timer = window.setTimeout(
-      () => change({ ...t, elapsed: Math.min(p.durationS, t.elapsed + speed) }),
+    const id = setTimeout(
+      () =>
+        onTick.current({
+          ...t,
+          elapsed: Math.min(p.durationS, t.elapsed + speed),
+        }),
       1000,
     );
-    return () => window.clearTimeout(timer);
-  }, [playing, t, speed, p.durationS, change]);
+    return () => clearTimeout(id);
+  }, [t, playing, speed, p.durationS]);
   const full = useMemo(
-    () => sampleProtocol(p, p.durationS, t.washAt),
-    [p, t.washAt],
-  );
-  const observed = full.slice(0, t.elapsed + 1),
+      () => sampleProtocol(p, p.durationS, t.washAt),
+      [p, t.washAt],
+    ),
+    observed = full.slice(0, t.elapsed + 1),
     live = observed[t.elapsed],
     index = Math.min(inspect ?? t.elapsed, t.elapsed),
     point = observed[index];
   const other = all.find((e) => e.id === compare)?.trial;
-  const matched =
-    other &&
-    other.plan.context === p.context &&
-    other.plan.knobs.scaleG === k.scaleG &&
-    other.plan.knobs.preloadG === k.preloadG
-      ? other
-      : null;
   const reference = useMemo(
     () =>
-      matched
-        ? sampleProtocol(matched.plan, matched.elapsed, matched.washAt)
+      other &&
+      other.plan.context === p.context &&
+      other.plan.knobs.scaleG === k.scaleG &&
+      other.plan.knobs.preloadG === k.preloadG
+        ? sampleProtocol(other.plan, other.elapsed, other.washAt).slice(
+            other.recordFromS ?? 0,
+          )
         : [],
-    [matched],
+    [other, p.context, k.scaleG, k.preloadG],
   );
-  const val = (q: Point) => q.forceG ?? q.relative * 100,
-    xmax = Math.max(1, index),
-    xmin = Math.max(0, xmax - span);
-  const peak = observed.reduce((a, b) => (b.relative > a.relative ? b : a)),
-    maxY = Math.max(
-      k.scaleG > 0 ? k.preloadG + k.scaleG : 100,
-      ...observed.map(val),
-      ...reference.map(val),
-    );
-  const currentDose = observed
-    .slice(0, index + 1)
-    .reverse()
-    .find((q) => q.event !== "");
-  const contact =
-    currentDose && currentDose.nominalM > 0
-      ? observed.slice(currentDose.s, index + 1)
-      : [];
-  const contactPeak = contact.length
-    ? contact.reduce((a, b) => (a.relative >= b.relative ? a : b))
-    : null;
-  const metrics = exposureMetrics(observed),
-    peaks: [number, number][] = metrics.map((e) => [
-      Math.log10(observed[e.onsetS].nominalM),
-      100 * e.peakRelative,
-    ]);
-  const curve = useMemo(() => doseCurve(p), [p]);
+  const initial = p.initialVolumeMl ?? source.volumeMl,
+    recipe = sources[t.solutionRecipe ?? p.context].solution,
+    manual = p.schedule === "manual",
+    canTransfer =
+      manual &&
+      !t.stopped &&
+      t.elapsed < p.durationS &&
+      (p.transfers?.length ?? 0) < 7201;
+  let preview: ReturnType<typeof mix> | undefined,
+    problem = "";
+  const additionMl = Number(volume);
+  let stockM = 0;
+  try {
+    stockM = molar(Number(stock), unit);
+    if (
+      stockM < 1e-12 ||
+      stockM > 1 ||
+      !(additionMl >= 1e-6 && additionMl <= 100)
+    )
+      throw Error(
+        "Enter stock from 1 pM to 1 M and volume from 0.000001 to 100 mL.",
+      );
+    preview = mix(live, stockM, additionMl);
+  } catch (e) {
+    problem = (e as Error).message;
+  }
+  function transfer(op: Transfer) {
+    if (canTransfer)
+      update({ ...t, plan: { ...p, transfers: [...(p.transfers ?? []), op] } });
+  }
+  const records = [
+    ...observed
+      .flatMap((q) =>
+        (q.commands ?? (q.event ? [q.event] : [])).map((event) => ({
+          s: q.s,
+          event,
+        })),
+      )
+      .map((q) => ({
+        s: q.s,
+        text:
+          q.event === "wash"
+            ? "Bath washed"
+            : q.event.startsWith("add")
+              ? "Acetylcholine administered"
+              : "Reservoir exchange",
+        detail: q.event,
+      })),
+    ...exp.events.map((e) => ({
+      s: Number(e.text.match(/^\[(\d+) s\]/)?.[1] ?? 0),
+      text: e.text,
+      detail: e.at,
+    })),
+  ].sort((a, b) => b.s - a.s);
   function update(v: Trial) {
+    v = { ...v, plan: { ...v.plan, version: WORKSTATION } };
     if (!validTrial(v)) {
       report("Value outside supported numerical range; settings unchanged.");
       return;
@@ -149,462 +255,710 @@ export function ProtocolBench({
       />
     </label>
   );
-  function exportData(kind: "trace" | "curve" | "registry" | "experiment") {
-    const meta = {
-      ...trialMetadata(t, exp.id, exp.created),
-      analysis: metrics,
-    };
-    const prefix = `${exp.id}-ach-${kind}`;
-    if (kind === "trace" || kind === "curve")
-      download(
-        prefix + ".csv",
-        kind === "trace" ? csv(meta, observed) : csv(meta, curve),
-        "text/csv",
-      );
-    else
-      download(
-        prefix + ".json",
-        JSON.stringify(
-          kind === "registry"
-            ? meta
-            : { experiment: exp, metadata: meta, samples: observed },
-          null,
-          2,
-        ),
-      );
-  }
-  return (
+  const drugInputs = (
     <>
-      <div className="labgrid">
-        <section className="panel">
-          <div className="mini">PREPARATION / OPTION A</div>
-          <h2>{source.preparation}</h2>
-          <p>Guinea-pig ileum · {source.recording}</p>
-          <p>{source.method}</p>
-          <p>
-            <small>Bath</small>
-            {source.temperatureC} °C · {source.gas} · {fmt(live.volumeMl)} mL
-          </p>
-          <p>
-            <small>Nominal ACh</small>
-            {fmt(live.nominalM * 1e6)} µM · ideal mixing; no hydrolysis
-          </p>
-          <a href={source.url} target="_blank" rel="noreferrer">
-            {source.publication}
-          </a>
-          <details>
-            <summary>Experimental conditions</summary>
-            <p>{source.solution}</p>
-            <p>
-              {source.animals}. {source.n}. {source.location}. Equilibration not
-              specified here.
-            </p>
-          </details>
-        </section>
-        <section className="panel apparatus">
-          <div className="instrumentHead">
-            <div className="heroLabel">ISOMETRIC / SIMULATED</div>
-            <h2>Organ bath assembly</h2>
-          </div>
-          <div style={{ transform: magnify ? "scale(1.12)" : "none" }}>
-            <Bath
-              state={{
-                mounted: true,
-                status: "AWAITING SCIENTIFIC VALIDATION",
-                tension: live.forceG,
-                relative: live.relative,
-              }}
-            />
-          </div>
-          <div className="actions">
-            <button onClick={() => magnification(!magnify)}>
-              Zoom {magnify ? "out" : "in"}
-            </button>
-            <button onClick={() => magnification(false)}>Reset view</button>
-          </div>
-          <p className="resting" aria-live="off">
-            {live.forceG === null
-              ? `${fmt(100 * live.relative)}% relative signal`
-              : `${fmt(live.forceG)} g · assumed scale`}{" "}
-            · {t.elapsed} s
-          </p>
-        </section>
-        <section className="panel dosage">
-          <div className="mini">ACh / EXPOSURE CONTROL</div>
-          <h2>Protocol settings</h2>
-          <div className="fields">
-            <label>
-              Source profile
-              <select
-                disabled={locked}
-                value={p.context}
-                onChange={(e) => {
-                  seek(null);
-                  change(preset(e.target.value as Context));
-                }}
-              >
-                {Object.entries(sources).map(([id, s]) => (
-                  <option key={id} value={id}>
-                    {s.preparation} · {s.publication}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Exposure protocol
-              <select
-                disabled={locked}
-                value={p.schedule}
-                onChange={(e) => {
-                  const v = e.target.value as Schedule;
-                  update({
-                    ...t,
-                    plan: {
-                      ...p,
-                      schedule: v,
-                      durationS:
-                        v === "paired"
-                          ? 1800
-                          : v === "prolonged"
-                            ? 2100
-                            : v === "series" || v === "repeated"
-                              ? 540
-                              : 180,
-                    },
-                  });
-                }}
-              >
-                {Object.entries(schedules).map(([id, label]) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {numbers(
-              `Final ACh (${unit})`,
-              p.doseM / molar(1, unit),
-              1e-12 / molar(1, unit),
-              1e-3 / molar(1, unit),
-              (v) => update({ ...t, plan: { ...p, doseM: molar(v, unit) } }),
-            )}
-            <label>
-              Concentration unit
-              <select
-                value={unit}
-                disabled={locked}
-                onChange={(e) => setUnit(e.target.value as typeof unit)}
-              >
-                {["M", "mM", "µM", "nM"].map((u) => (
-                  <option key={u}>{u}</option>
-                ))}
-              </select>
-            </label>
-            {numbers("Recording duration (s)", p.durationS, 5, 7200, (v) =>
-              update({ ...t, plan: { ...p, durationS: v } }),
-            )}
-          </div>
-          <details>
-            <summary>Planned additions and full bath exchanges</summary>
-            <p>
-              Virtual seconds from start. {source.contact}. Schedule below is a
-              simulation, not a replication.
-            </p>
-            {schedule(p).map((e) => (
-              <p key={e.s}>
-                {e.s} s ·{" "}
-                {e.targetM === 0
-                  ? "Full wash"
-                  : `${fmt(e.targetM * 1e6)} µM final`}
-              </p>
-            ))}
-          </details>
-        </section>
-      </div>
-      <section className="panel recorder">
-        <div className="mini">CHANNEL 01 / SIMULATED · UNVALIDATED</div>
-        <h2>Protocol recording</h2>
-        <p>
-          Source observations constrain only selected parameters. Timing and
-          sensitivity are provisional. Set a hypothetical force scale above zero
-          to display grams; no study maximum is used as that scale.
-        </p>
-        <div className="actions">
-          <button
-            disabled={playing || t.stopped || t.elapsed >= p.durationS}
-            onClick={() => play(true)}
+      <div className="dual">
+        <label>
+          Stock concentration
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={stock}
+            onChange={(e) => setField("stock", e.target.value)}
+          />
+        </label>
+        <label>
+          Stock unit
+          <select
+            value={unit}
+            onChange={(e) => setField("stockUnit", e.target.value)}
           >
-            {t.elapsed ? "Resume protocol" : "Start protocol"}
-          </button>
-          <button disabled={!playing} onClick={() => play(false)}>
-            Pause protocol
-          </button>
-          {p.schedule === "manual" && (
+            {["M", "mM", "µM", "nM"].map((v) => (
+              <option key={v}>{v}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label>
+        Administration volume (mL)
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={volume}
+          onChange={(e) => setField("volume", e.target.value)}
+        />
+      </label>
+    </>
+  );
+  const profile = (
+    <label>
+      Preparation
+      <select
+        aria-label="Source profile"
+        value={p.context}
+        disabled={locked}
+        onChange={(e) => {
+          const v = workstationPreset(e.target.value as Context);
+          change(v);
+          report("");
+        }}
+      >
+        {Object.entries(sources).map(([v, s]) => (
+          <option key={v} value={v}>
+            {s.preparation}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  const setupFields = (
+    <>
+      {profile}
+      <small>
+        Changing preparation loads its source recipe and default conditions.
+      </small>
+      <label>
+        Exposure protocol
+        <select
+          disabled={locked}
+          value={p.schedule}
+          onChange={(e) => {
+            const schedule = e.target.value as Schedule;
+            update({
+              ...t,
+              plan: {
+                ...p,
+                schedule,
+                durationS:
+                  schedule === "prolonged"
+                    ? 2100
+                    : schedule === "paired"
+                      ? 1800
+                      : ["series", "repeated"].includes(schedule)
+                        ? 540
+                        : 180,
+              },
+            });
+          }}
+        >
+          {Object.entries(schedules).map(([id, v]) => (
+            <option key={id} value={id}>
+              {v}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!manual &&
+        numbers("Scheduled target (µM)", p.doseM * 1e6, 1e-6, 1000, (v) =>
+          update({ ...t, plan: { ...p, doseM: v * 1e-6 } }),
+        )}
+      {numbers("Bath volume (mL)", initial, 1, 100, (v) =>
+        update({ ...t, plan: { ...p, initialVolumeMl: v } }),
+      )}
+      {numbers("Passive load (g)", k.preloadG, 0, 5, (v) =>
+        update({ ...t, plan: { ...p, knobs: { ...k, preloadG: v } } }),
+      )}
+      {numbers(
+        "Start acquisition at (s)",
+        recordFrom,
+        0,
+        p.durationS - 1,
+        (v) => update({ ...t, recordFromS: v }),
+      )}
+      {numbers("Recording duration (s)", p.durationS, 5, 7200, (v) =>
+        update({ ...t, plan: { ...p, durationS: v } }),
+      )}
+      <label>
+        Chart window
+        <select value={span} onChange={(e) => zoom(+e.target.value)}>
+          {[...new Set([15, 30, 60, 120, 300, 900, 7200, span])]
+            .sort((a, b) => a - b)
+            .map((v) => (
+              <option key={v} value={v}>
+                {v} s
+              </option>
+            ))}
+        </select>
+      </label>
+    </>
+  );
+  const apparatus = (
+    <Bath
+      state={{
+        mounted: true,
+        status: "AWAITING SCIENTIFIC VALIDATION",
+        tension: live.forceG,
+        relative: live.relative,
+      }}
+    />
+  );
+  const annotations = exp.events
+    .filter((e) => /^\[\d+ s\]/.test(e.text))
+    .map((e) => ({
+      s: Number(e.text.match(/\d+/)![0]),
+      text: e.text.replace(/^\[\d+ s\]\s*/, ""),
+    }));
+  const windowStart = start ?? Math.max(0, t.elapsed - span),
+    status =
+      t.stopped || t.elapsed === p.durationS
+        ? "Stopped"
+        : playing
+          ? "Recording"
+          : t.elapsed
+            ? "Paused"
+            : "Standby";
+  return (
+    <div className="instrument">
+      <div className="stationTitle">
+        <div>
+          <div className="overline">
+            <span /> EXPERIMENT WORKSPACE
+          </div>
+          <h1>Organ bath laboratory</h1>
+          <p>
+            Isolated tissue pharmacology <i>/</i> <em>Cavia porcellus</em>
+          </p>
+        </div>
+        <button onClick={save}>
+          <Save size={15} />
+          Save experiment
+        </button>
+      </div>
+      <button
+        className="mobileControls"
+        aria-expanded={drawer}
+        onClick={() => show(!drawer)}
+      >
+        <SlidersHorizontal size={16} /> {drawer ? "Hide" : "Show"} experiment
+        controls
+      </button>
+      <div className="instrumentLayout">
+        <section
+          className={"controlRack " + (drawer ? "rackOpen" : "")}
+          aria-label="Experiment controls"
+        >
+          <div className="rackHead">
+            <SlidersHorizontal size={17} />
+            <b>Experiment controls</b>
+          </div>
+          <Group icon={Layers3} name="Tissue preparation" open>
+            <label>
+              Tissue type
+              <select value={tissues[0]}>
+                {tissues.map((v, i) => (
+                  <option key={v} disabled={i > 0}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="wide" onClick={newRun}>
+              <Plus size={15} />
+              New experiment
+            </button>
+          </Group>
+          <Group icon={Zap} name="Stimulus">
+            <p>Electrical stimulation is not modeled.</p>
+            <fieldset disabled>
+              <legend>Stimulus off</legend>
+              <button>ON</button> <button>OFF</button>
+              <label>
+                <input type="radio" /> Nerve stimulation
+              </label>
+              <label>
+                <input type="radio" /> Muscle stimulation
+              </label>
+            </fieldset>
+          </Group>
+          <Group icon={Pipette} name="Drug administration" open>
+            <div className="drugSwitch">
+              {["Agonist", "Antagonist", "Unknown"].map((v) => (
+                <button
+                  key={v}
+                  aria-pressed={drugTab === v}
+                  onClick={() => drugTo(v)}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            {drugTab === "Agonist" ? (
+              <>
+                <label>
+                  Active drug
+                  <select>
+                    <option>{drugs[0]}</option>
+                  </select>
+                </label>
+                {tab !== "Dilution Formula" && drugInputs}
+                <div className="dosePreview">
+                  <span>Final bath concentration</span>
+                  <b>{preview ? fmt(preview.nominalM * 1e6) : "—"} µM</b>
+                </div>
+                {problem && <small role="alert">{problem}</small>}
+                <button
+                  className="greenBtn wide"
+                  disabled={!preview || !canTransfer}
+                  onClick={() =>
+                    transfer({
+                      s: t.elapsed,
+                      kind: "add",
+                      stockM,
+                      volumeMl: additionMl,
+                    })
+                  }
+                >
+                  <Plus size={16} />
+                  Add to organ bath
+                </button>
+                {!manual && (
+                  <small>Scheduled protocol controls additions.</small>
+                )}
+              </>
+            ) : (
+              <p>
+                No {drugTab.toLowerCase()} module is available for this
+                preparation.
+              </p>
+            )}
+          </Group>
+          <Group icon={Droplets} name="Reservoir">
+            <p>
+              Reservoir: {fmt((t.reservoirM ?? 0) * 1e6)} µM ACh. A flush
+              replaces the bath with {initial} mL; it does not reset tissue
+              history.
+            </p>
+            <label>
+              Prepare reservoir (µM ACh)
+              <input
+                type="number"
+                min="0"
+                max="1000"
+                value={reserve}
+                onChange={(e) => reserveTo(e.target.value)}
+              />
+            </label>
             <button
               disabled={
-                t.stopped ||
-                live.nominalM > 0 ||
-                live.event !== "" ||
-                t.elapsed >= p.durationS
+                !canTransfer ||
+                !reserve.trim() ||
+                !(Number(reserve) >= 0 && Number(reserve) <= 1000)
               }
               onClick={() =>
-                change({
-                  ...t,
-                  plan: {
-                    ...p,
-                    manual: [
-                      ...(p.manual ?? []),
-                      { s: t.elapsed, targetM: p.doseM },
-                    ],
-                  },
+                update({ ...t, reservoirM: Number(reserve) * 1e-6 })
+              }
+            >
+              Prepare reservoir
+            </button>
+            <button
+              disabled={!canTransfer}
+              onClick={() =>
+                transfer({
+                  s: t.elapsed,
+                  kind: "exchange",
+                  nominalM: t.reservoirM ?? 0,
                 })
               }
             >
-              Add ACh now
+              Flush reservoir to bath
             </button>
-          )}
-          <button
-            disabled={
-              t.stopped ||
-              live.nominalM === 0 ||
-              t.washAt !== null ||
-              (p.schedule === "manual" && !!live.event)
-            }
-            onClick={() =>
-              p.schedule === "manual"
-                ? change({
-                    ...t,
-                    plan: {
-                      ...p,
-                      manual: [
-                        ...(p.manual ?? []),
-                        { s: t.elapsed, targetM: 0 },
-                      ],
-                    },
-                  })
-                : change({ ...t, washAt: t.elapsed })
-            }
-          >
-            {p.schedule === "manual"
-              ? "Wash now"
-              : "Wash now · cancel remaining doses"}
-          </button>
-          <button
-            disabled={t.stopped}
-            onClick={() => {
-              play(false);
-              change({ ...t, stopped: true });
-            }}
-          >
-            Stop protocol
-          </button>
-          <label>
-            Playback speed
-            <select value={speed} onChange={(e) => speedTo(+e.target.value)}>
-              {[1, 10, 60].map((v) => (
-                <option key={v} value={v}>
-                  {v}×
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <Plot
-          label={
-            k.scaleG
-              ? "Total force (g) · assumed scale"
-              : "Active response (% of scenario scale)"
-          }
-          xLabel="Virtual time (s)"
-          series={observed.map((q) => [q.s, val(q)])}
-          overlay={
-            reference.length ? reference.map((q) => [q.s, val(q)]) : undefined
-          }
-          yMax={maxY}
-          xMin={xmin}
-          xMax={xmax}
-        />
-        <div className="fields">
-          <label>
-            Chart window
-            <select value={span} onChange={(e) => zoom(+e.target.value)}>
-              {[30, 180, 900, 7200].map((s) => (
-                <option key={s} value={s}>
-                  {s} s
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Inspect / pan (s)
-            <input
-              type="range"
-              min="0"
-              max={t.elapsed}
-              value={index}
-              onChange={(e) => seek(+e.target.value)}
-            />
-          </label>
-          <button onClick={() => seek(null)}>Follow live</button>
-          <label>
-            Compare saved run
-            <select
-              value={compare}
-              onChange={(e) => selectComparison(e.target.value)}
+            <button
+              disabled={!t.reservoirM || t.stopped}
+              onClick={() => update({ ...t, reservoirM: 0 })}
             >
-              <option value="">No overlay</option>
-              {all
-                .filter(
-                  (e) =>
-                    e.id !== exp.id &&
-                    e.trial?.plan.context === p.context &&
-                    e.trial.plan.knobs.scaleG === k.scaleG &&
-                    e.trial.plan.knobs.preloadG === k.preloadG,
-                )
-                .map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-        </div>
-        <p>
-          At {index} s: phasic {fmt(point.phasic * 100)}%, sustained{" "}
-          {fmt(point.tonic * 100)}%, secondary {fmt(point.secondary * 100)}%.
-          History index {fmt(point.memory)}. Baseline load {k.preloadG} g;
-          highest recorded signal {fmt(val(peak))}
-          {k.scaleG ? " g" : "%"} at {peak.s} s.
-        </p>
-        {contactPeak && currentDose && (
-          <p>
-            Current exposure: sampled time to peak{" "}
-            {contactPeak.s - currentDose.s} s · decline from peak{" "}
-            {fmt(100 * (contactPeak.relative - point.relative))} percentage
-            points.
-          </p>
-        )}
-        <details>
-          <summary>Concentration–response and source comparison</summary>
-          {peaks.length > 0 && (
-            <>
-              <Plot
-                label="Sampled exposure peaks · % of scenario scale"
-                xLabel="log₁₀ nominal bath [ACh] (mol/L)"
-                series={[]}
-                dots={peaks}
-                xMin={Math.min(...peaks.map((q) => q[0])) - 0.25}
-                xMax={Math.max(...peaks.map((q) => q[0])) + 0.25}
-                yMax={Math.max(1, ...peaks.map((q) => q[1]))}
-              />
-              <p>
-                One simulated maximum per contact interval, including the
-                ongoing interval. A repeated concentration can produce different
-                peaks; these are not independent calibration points.
-              </p>
-            </>
-          )}
-          <Plot
-            label="Static Hill drive (%) · not the time trace"
-            xLabel="log₁₀ [ACh] (mol/L)"
-            series={curve.map((q) => [q.logM, q.percent])}
-            xMin={curve[0].logM}
-            xMax={curve.at(-1)!.logM}
-            yMax={100}
-            mark={
-              p.context === "mplm" && Math.abs(Math.log10(k.ec50M / 4e-8)) <= 3
-                ? [Math.log10(4e-8), 50]
-                : undefined
-            }
-          />
-          <p>
-            Scenario pEC50 {fmt(pEC50(k.ec50M))} · slope {k.slope}.{" "}
-            {p.context === "mplm"
-              ? "Marker: reported 0.04 µM midpoint (pEC50 7.39 ± 0.04 SEM)."
-              : "No verified isometric potency for this profile and protocol."}{" "}
-            No digitised series: no pointwise residuals, goodness of fit or
-            fitted slope CI. A matched midpoint is not independent validation.
-          </p>
-        </details>
-        <details>
-          <summary>
-            Parameter registry · inspect or adjust before starting
-          </summary>
-          <div className="fields">
-            {registry(p.context, k).map((r) =>
-              numbers(
-                `${r.name} (${r.unit}) · ${r.provenance}`,
-                r.value,
-                fields[r.key][2],
-                fields[r.key][3],
-                (v) =>
+              Clear drugs from reservoir
+            </button>
+          </Group>
+          <Group icon={Beaker} name="Physiological solution">
+            <label>
+              Salt solution
+              <select
+                value={t.solutionRecipe ?? "profile"}
+                disabled={locked}
+                onChange={(e) =>
                   update({
                     ...t,
-                    plan: { ...p, knobs: { ...k, [r.key as keyof Knobs]: v } },
-                  }),
-              ),
-            )}
-          </div>
-          <p>
-            Secondary onset in intact tissue: 2.5 ± 0.3 min, n=16, prolonged 5.5
-            µM ACh only. Use elsewhere is hypothetical. Model {p.version};
-            parameters without reported uncertainty have no experimental
-            interval.
-          </p>
-        </details>
-        <details>
-          <summary>Exposure measurements</summary>
-          <p>
-            Relative signal, not grams. Onset is the first rise exceeding 0.1
-            percentage point from the signal at addition. Terminal mean uses the
-            last ≤10 samples before a change; this is not an equilibrium
-            plateau. Mechanical return is the first sample within 1 percentage
-            point of the pre-addition baseline, not sensitivity recovery.
-          </p>
-          {metrics.map((e) => (
-            <p key={e.onsetS}>
-              {e.onsetS} s · {e.complete ? "closed interval" : "ongoing"} ·
-              baseline {fmt(e.baselineRelative * 100)}% · peak{" "}
-              {fmt(e.peakRelative * 100)}% in {e.timeToPeakS} s · onset{" "}
-              {e.onsetLatencyS === null
-                ? "not reached"
-                : e.onsetLatencyS + " s"}{" "}
-              · terminal mean {fmt(e.terminalMeanRelative * 100)}% (
-              {e.terminalWindowS.join("–")} s) · fade{" "}
-              {fmt(e.fadeRelative * 100)} pp · return after wash{" "}
-              {e.firstMechanicalReturnS === null
-                ? "not observed"
-                : e.firstMechanicalReturnS + " s"}
+                    solutionRecipe:
+                      e.target.value === "profile"
+                        ? undefined
+                        : (e.target.value as "mplm" | "intact"),
+                  })
+                }
+              >
+                <option value="profile">
+                  Profile solution · {source.solution.split(/[,(]/)[0]}
+                </option>
+                {(["mplm", "intact"] as const)
+                  .filter((c) => c !== p.context)
+                  .map((c) => (
+                    <option key={c} value={c}>
+                      {sources[c].solution.split(/[,(]/)[0]} · metadata only
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <p>{recipe}</p>
+            <small>
+              Recipe metadata only. An alternative solution is not a calibration
+              for these conditions.
+            </small>
+          </Group>
+          <Group icon={Settings2} name="Experimental conditions">
+            {tab !== "Experimental Setup" && setupFields}
+            <p>
+              {source.temperatureC} °C · {source.gas}. Temperature and gas are
+              descriptive. Equilibration duration is unmodeled.
             </p>
-          ))}
-        </details>
-        <CurveReview
-          key={p.context}
-          trial={t}
-          change={change}
-          download={download}
-          id={exp.id}
-          date={exp.created}
-        />
-        <details>
-          <summary>Executed exposure history</summary>
-          {observed
-            .filter((q) => q.event)
-            .map((q) => (
-              <p key={q.s}>
-                {q.s} s · {q.event} → {fmt(q.nominalM * 1e6)} µM
-              </p>
+          </Group>
+        </section>
+        <section className="workArea">
+          <div className="stationTabs">
+            {(
+              [
+                ["Chart", ChartNoAxesCombined],
+                ["Experimental Setup", SlidersHorizontal],
+                ["Dilution Formula", Calculator],
+              ] as const
+            ).map(([name, I]) => (
+              <button
+                key={name}
+                aria-pressed={tab === name}
+                onClick={() => tabTo(name)}
+              >
+                <I size={16} />
+                {name}
+              </button>
             ))}
-        </details>
-        <div className="actions">
-          {(["trace", "curve", "registry", "experiment"] as const).map((v) => (
-            <button key={v} onClick={() => exportData(v)}>
-              Export {v} {v === "trace" || v === "curve" ? "CSV" : "JSON"}
-            </button>
-          ))}
-        </div>
-        {error && <p role="alert">{error}</p>}
-      </section>
-    </>
+          </div>
+          {tab === "Chart" ? (
+            <>
+              <section className="recorderCard">
+                <div className="recHead">
+                  <div>
+                    <div className="micro">
+                      <i /> SIGNAL ACQUISITION
+                    </div>
+                    <h2>Isometric recording</h2>
+                  </div>
+                  <span className="statePill">
+                    <i />
+                    {status}
+                  </span>
+                </div>
+                <div className="readingStrip">
+                  {(
+                    [
+                      [Timer, "Elapsed time", stamp(t.elapsed), "min:s"],
+                      [
+                        Activity,
+                        "Response",
+                        t.elapsed && t.elapsed >= recordFrom
+                          ? fmt(live.forceG ?? live.relative * 100)
+                          : "—",
+                        k.scaleG ? "g" : "%",
+                      ],
+                      [Droplets, "Bath ACh", fmt(live.nominalM * 1e6), "µM"],
+                      [Thermometer, "Temperature", source.temperatureC, "°C"],
+                    ] as const
+                  ).map(([I, n, v, u]) => (
+                    <div key={n}>
+                      <small>
+                        <I size={13} />
+                        {n}
+                      </small>
+                      <b>
+                        {v} <em>{u}</em>
+                      </b>
+                    </div>
+                  ))}
+                </div>
+                <TraceScreen
+                  points={observed}
+                  reference={reference}
+                  start={windowStart}
+                  span={span}
+                  annotations={annotations}
+                  recordFrom={recordFrom}
+                />
+                <div className="scopeLegend">
+                  <span>
+                    <i />
+                    Simulated response · provisional
+                  </span>
+                  <small>
+                    CH 01 <i> / </i> 1 Hz
+                  </small>
+                </div>
+                <div className="transport">
+                  <button
+                    className="greenBtn"
+                    disabled={playing || t.stopped || t.elapsed >= p.durationS}
+                    onClick={() => play(true)}
+                  >
+                    <Play size={14} />
+                    {t.elapsed ? "Resume" : "Record"}
+                  </button>
+                  <button disabled={!playing} onClick={() => play(false)}>
+                    <Pause size={14} />
+                    Pause
+                  </button>
+                  <button
+                    disabled={t.stopped || (!playing && !t.elapsed)}
+                    onClick={() => {
+                      play(false);
+                      change({ ...t, stopped: true });
+                    }}
+                  >
+                    <Square size={12} />
+                    Stop
+                  </button>
+                  <button
+                    disabled={
+                      t.stopped || t.elapsed >= p.durationS || !live.nominalM
+                    }
+                    onClick={() =>
+                      manual
+                        ? transfer({
+                            s: t.elapsed,
+                            kind: "exchange",
+                            nominalM: 0,
+                          })
+                        : change({ ...t, washAt: t.elapsed })
+                    }
+                  >
+                    <Waves size={15} />
+                    Wash
+                  </button>
+                  <div className="zoomBar">
+                    <button
+                      aria-label="Zoom in"
+                      onClick={() => zoom(Math.max(15, span / 2))}
+                      disabled={span <= 15}
+                    >
+                      <Plus size={15} />
+                    </button>
+                    <button
+                      aria-label="Zoom out"
+                      onClick={() => zoom(Math.min(7200, span * 2))}
+                      disabled={span >= 7200}
+                    >
+                      <Minus size={15} />
+                    </button>
+                    <button
+                      aria-label="Reset chart view"
+                      onClick={() => {
+                        zoom(60);
+                        pan(null);
+                        seek(null);
+                      }}
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                </div>
+              </section>
+              <div className="belowScope">
+                <section className="journal">
+                  <div className="micro">SESSION JOURNAL</div>
+                  <div className="sectionHead">
+                    <h3>Event log</h3>
+                    <button onClick={annotate}>
+                      <NotebookPen size={14} />
+                      Annotate
+                    </button>
+                  </div>
+                  <div className="logEntry">
+                    <time>00:00</time>
+                    <span>Preparation mounted · {exp.name}</span>
+                  </div>
+                  {records.slice(0, 4).map((v, i) => (
+                    <div className="logEntry" key={i} title={v.detail}>
+                      <time>{stamp(v.s)}</time>
+                      <span>{v.text}</span>
+                    </div>
+                  ))}
+                  {!records.length && (
+                    <small>
+                      Administration, wash and annotation events appear here.
+                    </small>
+                  )}
+                </section>
+                <button
+                  className="apparatusTile"
+                  onClick={() => tabTo("Experimental Setup")}
+                >
+                  <span className="micro">
+                    APPARATUS <Maximize2 size={13} />
+                  </span>
+                  <b>Organ bath assembly</b>
+                  {apparatus}
+                </button>
+              </div>
+              <details className="utility">
+                <summary>
+                  <ListTree size={15} /> Timeline &amp; inspection
+                </summary>
+                <div className="fields">
+                  <label>
+                    Window start (s)
+                    <input
+                      type="number"
+                      min="0"
+                      max={t.elapsed}
+                      value={windowStart}
+                      onChange={(e) =>
+                        pan(
+                          Math.max(
+                            0,
+                            Math.min(t.elapsed, Math.floor(+e.target.value)),
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <button onClick={() => pan(null)}>Follow live</button>
+                  <label>
+                    Inspect sample (s)
+                    <input
+                      type="range"
+                      disabled={t.elapsed < recordFrom}
+                      min={Math.min(recordFrom, t.elapsed)}
+                      max={t.elapsed}
+                      value={index}
+                      onChange={(e) => seek(+e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Playback speed
+                    <select
+                      value={speed}
+                      onChange={(e) => speedTo(+e.target.value)}
+                    >
+                      {[1, 10, 60].map((v) => (
+                        <option key={v} value={v}>
+                          {v}×
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Compare saved run
+                    <select
+                      value={compare}
+                      onChange={(e) => selectComparison(e.target.value)}
+                    >
+                      <option value="">No overlay</option>
+                      {all
+                        .filter(
+                          (e) =>
+                            e.id !== exp.id &&
+                            e.trial?.plan.context === p.context &&
+                            e.trial.plan.knobs.scaleG === k.scaleG &&
+                            e.trial.plan.knobs.preloadG === k.preloadG,
+                        )
+                        .map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+                <p>
+                  {index >= recordFrom ? (
+                    <>
+                      At {index} s: phasic {fmt(point.phasic * 100)}%, sustained{" "}
+                      {fmt(point.tonic * 100)}%, secondary{" "}
+                      {fmt(point.secondary * 100)}%.
+                    </>
+                  ) : (
+                    "No sample acquired at this time."
+                  )}{" "}
+                  Passive load {k.preloadG} g. Baseline active response 0%. No
+                  validated absolute force. Leaving the laboratory pauses
+                  virtual time.
+                </p>
+              </details>
+            </>
+          ) : tab === "Experimental Setup" ? (
+            <section className="stationCard">
+              <div className="micro">INSTRUMENT CONFIGURATION</div>
+              <h2>Experimental setup</h2>
+              <p>{source.method}</p>
+              <button onClick={() => expand(!expanded)}>
+                <Maximize2 size={15} />
+                {expanded ? "Compact" : "Expand"} apparatus
+              </button>
+              <div className={"setupBath " + (expanded ? "expanded" : "")}>
+                {apparatus}
+              </div>
+              <div className="fields">{setupFields}</div>
+              <p>
+                {source.recording} · {source.temperatureC} °C · {source.gas}
+              </p>
+              <p>{recipe}</p>
+              <p>
+                Bath: {fmt(live.volumeMl)} mL · {fmt(live.nominalM * 1e6)} µM
+                ACh. Reservoir: {fmt((t.reservoirM ?? 0) * 1e6)} µM. Passive
+                load: {k.preloadG} g.
+              </p>
+              <p>
+                Stimulus off · ACh only · full bath exchange. Equilibration not
+                modeled.
+              </p>
+              <a href={source.url} target="_blank" rel="noreferrer">
+                {source.publication}
+              </a>
+              <details>
+                <summary>Planned exposure schedule</summary>
+                {schedule(p).map((e) => (
+                  <p key={e.s}>
+                    {e.s} s · {fmt(e.targetM * 1e6)} µM
+                  </p>
+                ))}
+              </details>
+            </section>
+          ) : (
+            <section className="stationCard">
+              <div className="micro">MASS BALANCE</div>
+              <h2>Dilution formula</h2>
+              <p>
+                Preview the next bolus in the active, well-mixed bath.
+                Calculating does not administer drug.
+              </p>
+              <div className="formula">Cꜰ = (Cᵢ Vᵦ + Cₛ Vₐ) / (Vᵦ + Vₐ)</div>
+              {drugInputs}
+              <p>
+                Current bath: {fmt(live.nominalM * 1e6)} µM ×{" "}
+                {fmt(live.volumeMl)} mL
+              </p>
+              {preview ? (
+                <p>
+                  ({fmt(live.nominalM * 1e6)} × {fmt(live.volumeMl)} +{" "}
+                  {fmt(stockM * 1e6)} × {fmt(additionMl)}) /{" "}
+                  {fmt(preview.volumeMl)} ={" "}
+                  <b>{fmt(preview.nominalM * 1e6)} µM</b> in{" "}
+                  {fmt(preview.volumeMl)} mL.
+                </p>
+              ) : (
+                <p role="alert">{problem}</p>
+              )}
+            </section>
+          )}
+          <ProtocolNotebook
+            exp={exp}
+            observed={observed}
+            change={update}
+            download={download}
+            reset={reset}
+            notes={notes}
+            numbers={numbers}
+          />
+          {error && <p role="alert">{error}</p>}
+        </section>
+      </div>
+    </div>
   );
 }
