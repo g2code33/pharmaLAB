@@ -90,7 +90,7 @@ jobs:
           TARGET: ${{ inputs.target || 'all' }}
         run: |
           {
-            printf '## Delivery record\nCommit `%s` · ref `%s` · run [%s](%s/%s/actions/runs/%s)\n' "$GITHUB_SHA" "$GITHUB_REF" "$GITHUB_RUN_ID" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf '## Delivery record\nCommit %s · ref %s · run [%s](%s/%s/actions/runs/%s)\n' "$GITHUB_SHA" "$GITHUB_REF" "$GITHUB_RUN_ID" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
             printf '\nSelected targets: %s. Other targets excluded by dispatch. No hosted deployment configured.\n' "$TARGET"
             echo 'Tests, audits and runtime checks: see Product verification job steps. Asset names, signing and byte sizes: see verification summary.'
             jq -r 'to_entries[]|"- \(.key): \(.value.result)"' <<< "$RESULTS"
