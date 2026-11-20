@@ -15,6 +15,25 @@ export default defineConfig({
   plugins: [
     {
       name: "build-identity",
+      transformIndexHtml(html, ctx) {
+        if (
+          !ctx.bundle ||
+          process.env.TAURI_ENV_PLATFORM ||
+          build.target !== "web"
+        )
+          return html;
+        return [
+          {
+            tag: "meta",
+            injectTo: "head-prepend",
+            attrs: {
+              "http-equiv": "Content-Security-Policy",
+              content:
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'",
+            },
+          },
+        ];
+      },
       generateBundle() {
         this.emitFile({
           type: "asset",

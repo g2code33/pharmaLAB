@@ -1,0 +1,98 @@
+name: Verified delivery
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version: {description: 'Expected committed version (optional assertion)', type: string}
+      target: {type: choice, options: [all, web, linux, windows], default: all}
+      mode: {type: choice, options: [build-only, prerelease, stable], default: build-only}
+      deployment: {type: choice, options: [none, request-hosted-deployment], default: none}
+permissions: {contents: read}
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      mode: ${{ steps.policy.outputs.mode }}
+      tag: ${{ steps.policy.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, persist-credentials: false}
+      - id: policy
+        env:
+          REQUEST: ${{ inputs.mode }}
+          EXPECTED: ${{ inputs.version }}
+          TARGET: ${{ inputs.target || 'all' }}
+          DEPLOY: ${{ inputs.deployment }}
+        run: |
+          set -euo pipefail
+          version=$(node scripts/version.mjs check)
+          [[ -z $EXPECTED || $EXPECTED = "$version" ]] || { echo 'Version override differs from source; bump and commit first'; exit 1; }
+          [[ -z $DEPLOY || $DEPLOY = none ]] || { echo 'Blocked: no hosting provider configured or authorized'; exit 1; }
+          if [[ $GITHUB_REF_TYPE = tag ]]; then
+            [[ $GITHUB_REF_NAME = "v$version" ]]; mode=${REQUEST:-stable}
+            [[ $mode != prerelease ]]
+          else mode=${REQUEST:-prerelease}; fi
+          if [[ $mode != build-only ]]; then
+            [[ $TARGET = all ]]; [[ $GITHUB_REF_TYPE = tag || $GITHUB_REF = refs/heads/main ]]; git merge-base --is-ancestor HEAD origin/main
+          fi
+          tag="main-${GITHUB_SHA:0:7}"; if [[ $mode = stable ]]; then tag="v$version"; fi
+          printf 'mode=%s\ntag=%s\n' "$mode" "$tag" >> "$GITHUB_OUTPUT"
+  build:
+    needs: plan
+    uses: ./.github/workflows/ci.yml
+    with: {target: '${{ inputs.target || ''all'' }}'}
+    secrets:
+      WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
+      WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+  verify:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@v4
+        with: {path: incoming, pattern: 'pharmalab-*'}
+      - env: {TARGET: '${{ inputs.target || ''all'' }}'}
+        run: node scripts/delivery.mjs collect incoming "$TARGET" verified
+  publish:
+    needs: [plan, verify]
+    if: needs.plan.outputs.mode != 'build-only'
+    runs-on: ubuntu-24.04
+    environment: ${{ needs.plan.outputs.mode == 'stable' && 'production' || 'development-releases' }}
+    concurrency:
+      group: delivery-${{ needs.plan.outputs.mode == 'stable' && 'stable' || needs.plan.outputs.tag }}
+      cancel-in-progress: false
+    permissions: {contents: write}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/download-artifact@v4
+        with: {path: incoming, pattern: 'pharmalab-*'}
+      - run: node scripts/delivery.mjs collect incoming all verified
+      - name: Require configured reviewers for manual stable publication
+        if: github.event_name == 'workflow_dispatch' && needs.plan.outputs.mode == 'stable'
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: gh api "repos/$GITHUB_REPOSITORY/environments/production" | jq -e 'any(.protection_rules[]; .type=="required_reviewers" and (.reviewers|length)>0)'
+      - env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          CHANNEL: ${{ needs.plan.outputs.mode }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/publish.sh
+  summary:
+    if: always()
+    needs: [plan, build, verify, publish]
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+          TARGET: ${{ inputs.target || 'all' }}
+        run: |
+          {
+            printf '## Delivery record\nCommit `%s` · ref `%s` · run [%s](%s/%s/actions/runs/%s)\n' "$GITHUB_SHA" "$GITHUB_REF" "$GITHUB_RUN_ID" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf '\nSelected targets: %s. Other targets excluded by dispatch. No hosted deployment configured.\n' "$TARGET"
+            echo 'Tests, audits and runtime checks: see Product verification job steps. Asset names, signing and byte sizes: see verification summary.'
+            jq -r 'to_entries[]|"- \(.key): \(.value.result)"' <<< "$RESULTS"
+            echo 'Publishing is skipped for build-only mode or unmet dependencies. See the first failed step for details.'
+          } >> "$GITHUB_STEP_SUMMARY"
