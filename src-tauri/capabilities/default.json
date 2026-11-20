@@ -1,1 +1,1 @@
-{"identifier":"workspace","windows":["main"],"permissions":["core:default","sql:default","sql:allow-execute"]}
+{"identifier":"workspace","windows":["main"],"permissions":["allow-read-record","allow-write-record"]}

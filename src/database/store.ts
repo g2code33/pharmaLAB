@@ -10,19 +10,11 @@ function open() {
     r.onblocked = () => no(Error("Close other PharmaLab windows"));
   }));
 }
-const sql = () =>
-  import("@tauri-apps/plugin-sql").then((m) =>
-    m.default.load("sqlite:pharmalab.db"),
-  );
-let db: ReturnType<typeof sql>;
 export async function get<T>(key: string): Promise<T | undefined> {
   if (desktop) {
-    const rows = await (
-      await (db ??= sql())
-    ).select<{ value: string }[]>("SELECT value FROM records WHERE key=?", [
-      key,
-    ]);
-    return rows.length ? JSON.parse(rows[0].value) : undefined;
+    const { invoke } = await import("@tauri-apps/api/core");
+    const value = await invoke<string | null>("read_record", { key });
+    return value === null ? undefined : JSON.parse(value);
   }
   const d = await open();
   return new Promise((ok, no) => {
@@ -33,12 +25,8 @@ export async function get<T>(key: string): Promise<T | undefined> {
 }
 export async function put(key: string, value: unknown) {
   if (desktop) {
-    await (
-      await (db ??= sql())
-    ).execute("INSERT OR REPLACE INTO records(key,value) VALUES(?,?)", [
-      key,
-      JSON.stringify(value),
-    ]);
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("write_record", { key, value: JSON.stringify(value) });
     return;
   }
   const d = await open();
