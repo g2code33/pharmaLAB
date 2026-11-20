@@ -6,7 +6,7 @@
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build && node scripts/cache.mjs",
+    "build": "tsc --noEmit && vite build && node scripts/notices.mjs && node scripts/cache.mjs",
     "tauri": "tauri",
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
