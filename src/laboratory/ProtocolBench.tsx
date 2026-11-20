@@ -17,8 +17,6 @@ import {
   Settings2,
   SlidersHorizontal,
   Square,
-  Thermometer,
-  Timer,
   Waves,
   Zap,
   Calculator,
@@ -117,6 +115,21 @@ export function ProtocolBench({
     volume = exp.conditions.volume ?? "0.03",
     unit = (exp.conditions.stockUnit ?? "mM") as "M" | "mM" | "µM" | "nM";
   const recordFrom = t.recordFromS ?? 0;
+  const [showExample, exampleTo] = useState(false);
+  // This read-only example is never written to the active experiment or exports.
+  const demo = useMemo(() => {
+    if (!showExample) return [];
+    const plan = workstationPreset().plan;
+    plan.durationS = 200;
+    plan.transfers = [1e-7, 4e-7, 1.6e-6, 6.4e-6].flatMap(
+      (stockM, i): Transfer[] => [
+        { s: 5 + 50 * i, kind: "add", stockM, volumeMl: 0.1 },
+        { s: 29 + 50 * i, kind: "exchange", nominalM: 0 },
+      ],
+    );
+    return sampleProtocol(plan, 200);
+  }, [showExample]);
+  const example = showExample && !playing && !t.elapsed;
   const locked =
     t.elapsed > 0 ||
     !!p.manual?.length ||
@@ -191,6 +204,7 @@ export function ProtocolBench({
     problem = (e as Error).message;
   }
   function transfer(op: Transfer) {
+    exampleTo(false);
     if (canTransfer)
       update({ ...t, plan: { ...p, transfers: [...(p.transfers ?? []), op] } });
   }
@@ -413,13 +427,7 @@ export function ProtocolBench({
     <div className="instrument">
       <div className="stationTitle">
         <div>
-          <div className="overline">
-            <span /> EXPERIMENT WORKSPACE
-          </div>
           <h1>Organ bath laboratory</h1>
-          <p>
-            Isolated tissue pharmacology <i>/</i> <em>Cavia porcellus</em>
-          </p>
         </div>
         <button onClick={save}>
           <Save size={15} />
@@ -637,65 +645,39 @@ export function ProtocolBench({
               <section className="recorderCard">
                 <div className="recHead">
                   <div>
-                    <div className="micro">
-                      <i /> SIGNAL ACQUISITION
-                    </div>
-                    <h2>Isometric recording</h2>
+                    <h2>
+                      {example ? "Example kymograph" : "Kymograph tracing"}
+                    </h2>
                   </div>
+                  {example && (
+                    <button onClick={() => exampleTo(false)}>
+                      Return to live chart
+                    </button>
+                  )}
                   <span className="statePill">
                     <i />
                     {status}
                   </span>
                 </div>
-                <div className="readingStrip">
-                  {(
-                    [
-                      [Timer, "Elapsed time", stamp(t.elapsed), "min:s"],
-                      [
-                        Activity,
-                        "Response",
-                        t.elapsed && t.elapsed >= recordFrom
-                          ? fmt(live.forceG ?? live.relative * 100)
-                          : "—",
-                        k.scaleG ? "g" : "%",
-                      ],
-                      [Droplets, "Bath ACh", fmt(live.nominalM * 1e6), "µM"],
-                      [Thermometer, "Temperature", source.temperatureC, "°C"],
-                    ] as const
-                  ).map(([I, n, v, u]) => (
-                    <div key={n}>
-                      <small>
-                        <I size={13} />
-                        {n}
-                      </small>
-                      <b>
-                        {v} <em>{u}</em>
-                      </b>
-                    </div>
-                  ))}
-                </div>
                 <TraceScreen
-                  points={observed}
-                  reference={reference}
-                  start={windowStart}
-                  span={span}
-                  annotations={annotations}
-                  recordFrom={recordFrom}
+                  key={example ? "example" : "live"}
+                  points={example ? demo : observed}
+                  reference={example ? [] : reference}
+                  start={example ? 0 : windowStart}
+                  span={example ? 200 : span}
+                  annotations={example ? [] : annotations}
+                  recordFrom={example ? 0 : recordFrom}
+                  example={example}
+                  onExample={() => exampleTo(true)}
                 />
-                <div className="scopeLegend">
-                  <span>
-                    <i />
-                    Simulated response · provisional
-                  </span>
-                  <small>
-                    CH 01 <i> / </i> 1 Hz
-                  </small>
-                </div>
                 <div className="transport">
                   <button
                     className="greenBtn"
                     disabled={playing || t.stopped || t.elapsed >= p.durationS}
-                    onClick={() => play(true)}
+                    onClick={() => {
+                      exampleTo(false);
+                      play(true);
+                    }}
                   >
                     <Play size={14} />
                     {t.elapsed ? "Resume" : "Record"}
@@ -731,23 +713,95 @@ export function ProtocolBench({
                     <Waves size={15} />
                     Wash
                   </button>
+                  <button onClick={annotate}>
+                    <NotebookPen size={14} />
+                    Annotate
+                  </button>
+                  <span className="readingStrip" aria-label="Live bath status">
+                    {stamp(t.elapsed)} · {fmt(live.nominalM * 1e6)} µM ACh ·{" "}
+                    {source.temperatureC} °C
+                  </span>
+                </div>
+                <div className="timeControls">
+                  <label>
+                    Start time (s)
+                    <input
+                      type="number"
+                      min="0"
+                      max={t.elapsed}
+                      disabled={example}
+                      value={example ? 0 : windowStart}
+                      onChange={(e) =>
+                        pan(
+                          Math.max(
+                            0,
+                            Math.min(t.elapsed, Math.floor(+e.target.value)),
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                  <input
+                    type="range"
+                    aria-label="Scroll chart time"
+                    min={0}
+                    max={t.elapsed}
+                    disabled={example || !t.elapsed}
+                    value={windowStart}
+                    onChange={(e) => pan(+e.target.value)}
+                  />
+                  <button
+                    disabled={example || start === null}
+                    onClick={() => pan(null)}
+                  >
+                    Follow live
+                  </button>
+                  <label>
+                    Window size
+                    <select
+                      disabled={example}
+                      value={example ? 200 : span}
+                      onChange={(e) => zoom(+e.target.value)}
+                    >
+                      {[
+                        ...new Set([
+                          15,
+                          30,
+                          60,
+                          100,
+                          120,
+                          300,
+                          900,
+                          7200,
+                          example ? 200 : span,
+                        ]),
+                      ]
+                        .sort((a, b) => a - b)
+                        .map((n) => (
+                          <option key={n} value={n}>
+                            {n} s
+                          </option>
+                        ))}
+                    </select>
+                  </label>
                   <div className="zoomBar">
                     <button
                       aria-label="Zoom in"
                       onClick={() => zoom(Math.max(15, span / 2))}
-                      disabled={span <= 15}
+                      disabled={example || span <= 15}
                     >
                       <Plus size={15} />
                     </button>
                     <button
                       aria-label="Zoom out"
                       onClick={() => zoom(Math.min(7200, span * 2))}
-                      disabled={span >= 7200}
+                      disabled={example || span >= 7200}
                     >
                       <Minus size={15} />
                     </button>
                     <button
                       aria-label="Reset chart view"
+                      disabled={example}
                       onClick={() => {
                         zoom(60);
                         pan(null);
@@ -759,66 +813,11 @@ export function ProtocolBench({
                   </div>
                 </div>
               </section>
-              <div className="belowScope">
-                <section className="journal">
-                  <div className="micro">SESSION JOURNAL</div>
-                  <div className="sectionHead">
-                    <h3>Event log</h3>
-                    <button onClick={annotate}>
-                      <NotebookPen size={14} />
-                      Annotate
-                    </button>
-                  </div>
-                  <div className="logEntry">
-                    <time>00:00</time>
-                    <span>Preparation mounted · {exp.name}</span>
-                  </div>
-                  {records.slice(0, 4).map((v, i) => (
-                    <div className="logEntry" key={i} title={v.detail}>
-                      <time>{stamp(v.s)}</time>
-                      <span>{v.text}</span>
-                    </div>
-                  ))}
-                  {!records.length && (
-                    <small>
-                      Administration, wash and annotation events appear here.
-                    </small>
-                  )}
-                </section>
-                <button
-                  className="apparatusTile"
-                  onClick={() => tabTo("Experimental Setup")}
-                >
-                  <span className="micro">
-                    APPARATUS <Maximize2 size={13} />
-                  </span>
-                  <b>Organ bath assembly</b>
-                  {apparatus}
-                </button>
-              </div>
               <details className="utility">
                 <summary>
-                  <ListTree size={15} /> Timeline &amp; inspection
+                  <ListTree size={15} /> Inspection &amp; event log
                 </summary>
                 <div className="fields">
-                  <label>
-                    Window start (s)
-                    <input
-                      type="number"
-                      min="0"
-                      max={t.elapsed}
-                      value={windowStart}
-                      onChange={(e) =>
-                        pan(
-                          Math.max(
-                            0,
-                            Math.min(t.elapsed, Math.floor(+e.target.value)),
-                          ),
-                        )
-                      }
-                    />
-                  </label>
-                  <button onClick={() => pan(null)}>Follow live</button>
                   <label>
                     Inspect sample (s)
                     <input
@@ -880,6 +879,17 @@ export function ProtocolBench({
                   validated absolute force. Leaving the laboratory pauses
                   virtual time.
                 </p>
+                <h3>Event log</h3>
+                {records.length ? (
+                  records.map((v, i) => (
+                    <div className="logEntry" key={i}>
+                      <time>{stamp(v.s)}</time>
+                      {v.text}
+                    </div>
+                  ))
+                ) : (
+                  <p>No events recorded.</p>
+                )}
               </details>
             </>
           ) : tab === "Experimental Setup" ? (

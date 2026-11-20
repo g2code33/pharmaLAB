@@ -840,3 +840,210 @@ html[data-theme="Dark"] {
     gap: 8px;
   }
 }
+/* Chart recorder: one sheet, one trace, one transport. */
+.stationTitle {
+  padding: 0 0 12px;
+}
+.stationTitle h1 {
+  font-size: clamp(24px, 2.3vw, 34px);
+}
+.recHead {
+  padding-bottom: 5px;
+}
+.recHead h2 {
+  font-size: 20px;
+}
+.recHead > button {
+  margin-left: auto;
+}
+.recorderCard .readingStrip {
+  display: inline-block;
+  border: 0;
+  margin: 0 0 0 auto;
+  padding: 0;
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+.kymograph {
+  --ink-trace: #2646d6;
+  --paper: #fff;
+  --rule: #d7dce3;
+  margin: 10px 20px 4px;
+  font: 12px var(--mono);
+}
+html[data-theme="Dark"] .kymograph {
+  --ink-trace: #90a5ff;
+  --paper: #182320;
+  --rule: #394842;
+}
+.paperHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px 38px;
+  font: 12px system-ui;
+}
+.paperHead span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.paperBody {
+  position: relative;
+}
+.kymograph .graticule {
+  height: clamp(240px, 49dvh, 620px);
+  margin-left: 38px;
+  border: none;
+  border-left: 1px solid var(--muted);
+  border-bottom: 1px solid var(--muted);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(to right, var(--rule) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+  background-size:
+    10% 100%,
+    100% 25%;
+  cursor: crosshair;
+}
+.kymograph .graticule polyline {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.8;
+}
+.inkTrace {
+  stroke: var(--ink-trace);
+}
+.kymograph .yTicks {
+  inset: 0 auto 0 0;
+  width: 32px;
+}
+.kymograph .xTicks {
+  margin-left: 38px;
+}
+.kymograph .scopeEmpty {
+  pointer-events: none;
+}
+.kymograph .scopeEmpty button {
+  pointer-events: auto;
+  color: var(--accent);
+  margin-top: 6px;
+}
+.kymograph .scopeEmpty small,
+.kymograph .scopeEmpty b {
+  background: var(--paper);
+}
+.paperEvents {
+  position: relative;
+  margin: 4px 0 0 38px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.kymograph .scopeMark {
+  bottom: auto;
+  border: 0;
+  border-left: 2px solid #a99254;
+  padding: 1px 4px;
+  max-width: 18%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  line-height: 14px;
+}
+.paperCursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid #208c50;
+  pointer-events: none;
+}
+.paperCursor i {
+  position: absolute;
+  left: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #208c50;
+  transform: translateY(-50%);
+}
+.paperCursor output {
+  position: absolute;
+  top: 6px;
+  left: 4px;
+  background: var(--card);
+  color: var(--accent);
+  white-space: nowrap;
+  padding: 3px 6px;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+}
+.paperCursor output.flip {
+  left: auto;
+  right: 4px;
+}
+.timeControls {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-top: 1px solid var(--edge);
+  padding: 9px 16px;
+  flex-wrap: wrap;
+}
+.timeControls label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.timeControls label input[type="number"],
+.timeControls select {
+  margin: 0;
+  width: 80px;
+}
+.timeControls > input[type="range"] {
+  min-width: 60px;
+  flex: 1;
+  accent-color: var(--accent);
+}
+.timeControls .zoomBar {
+  margin-left: 0;
+}
+.instrument .transport {
+  margin-top: 9px;
+}
+.groupBody {
+  gap: 6px;
+}
+.ctrlGroup summary {
+  padding-block: 11px;
+}
+.scopeEmpty small {
+  max-width: 90%;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .kymograph {
+    margin: 8px;
+  }
+  .kymograph .graticule {
+    height: clamp(215px, 38dvh, 380px);
+  }
+  .recorderCard .readingStrip {
+    font-size: 10px;
+  }
+  .timeControls {
+    padding: 8px;
+    gap: 6px;
+  }
+  .timeControls > input[type="range"] {
+    max-width: 130px;
+  }
+  .paperHead {
+    margin-left: 0;
+  }
+  .kymograph .scopeMark {
+    max-width: 30%;
+  }
+  .timeControls label {
+    font-size: 11px;
+  }
+}

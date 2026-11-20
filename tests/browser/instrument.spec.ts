@@ -102,3 +102,28 @@ test("mobile drawer, chart, colour mode and navigable setup", async ({
     )
     .toBe(true);
 });
+
+test("example kymograph is inspectable and leaves the live bath untouched", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "View example tracing" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Example kymograph" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".scopeMark").filter({ hasText: "ACh" }),
+  ).toHaveCount(4);
+  await expect(
+    page.locator(".scopeMark").filter({ hasText: "Wash" }),
+  ).toHaveCount(4);
+  await page.locator(".graticule").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".paperCursor output")).toContainText("1 s");
+  await page.getByRole("button", { name: "Return to live chart" }).click();
+  await expect(
+    page.getByText("Ready to record", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".readingStrip")).toContainText("00:00 · 0 µM");
+  await expect(page.locator(".graticule polyline")).toHaveCount(0);
+});
