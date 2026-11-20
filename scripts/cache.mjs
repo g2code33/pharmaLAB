@@ -1,8 +1,16 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { createHash } from "node:crypto";
 const files = (await readdir("dist", { recursive: true, withFileTypes: true }))
   .filter((x) => x.isFile() && x.name !== "sw.js")
-  .map((x) => (x.parentPath + "/" + x.name).replace(/^dist/, ""));
+  .map(
+    (x) =>
+      "/" +
+      path
+        .relative("dist", path.join(x.parentPath, x.name))
+        .split(path.sep)
+        .join("/"),
+  );
 const hash = createHash("sha256");
 for (const f of files) hash.update(await readFile("dist" + f));
 const key = "pharmalab-" + hash.digest("hex").slice(0, 16);

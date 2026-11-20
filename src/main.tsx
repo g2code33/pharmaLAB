@@ -14,26 +14,16 @@ import {
   ChevronRight,
   ArrowRight,
   Plus,
-  HardDrive,
   Database,
   ShieldCheck,
-  BookOpen,
   Activity,
-  Microscope,
   FolderOpen,
-  CircleHelp,
   Monitor,
-  Check,
-  Download,
-  RefreshCw,
   Clock3,
-  Menu,
   X,
   ClipboardList,
-  Leaf,
   Network,
   Waypoints,
-  Beaker,
 } from "lucide-react";
 import { Bath } from "./laboratory/Bath";
 import {
@@ -183,7 +173,6 @@ function App() {
     event(`Recording ${s.toLowerCase()} (no signal)`);
   }
   const latest = all[0];
-  const PageIcon = icons[pages.indexOf(page)];
   const status = storageError
     ? "Unavailable"
     : ready
@@ -296,7 +285,7 @@ function App() {
           <span className="dot" />
           Local workspace
           <small>
-            PharmaLab <span>v0.1.0</span>
+            PharmaLab <span>v{__BUILD__.version}</span>
           </small>
         </div>
       </aside>
@@ -878,7 +867,10 @@ function App() {
           )}
           {page === "About PharmaLab" && (
             <section className="panel">
-              <div className="mini">FOUNDATION RELEASE · 0.1.0</div>
+              <div className="mini">
+                FOUNDATION RELEASE · {__BUILD__.version} ·{" "}
+                {__BUILD__.sha.slice(0, 7)}
+              </div>
               <h2>PharmaLab</h2>
               <p>
                 A local laboratory for independent experimentation and

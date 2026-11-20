@@ -2,3 +2,5 @@ node_modules/
 dist/
 target/
 test-results/
+release-out/
+src-tauri/gen/
