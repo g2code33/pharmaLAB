@@ -5,7 +5,11 @@ import { get, put } from "../src/database/store";
 import { create, valid, engine } from "../src/simulation/core";
 import { evidence, hasProvenance } from "../src/evidence/register";
 test("versioned notebook round trip preserves historical revision", async () => {
-  const record = { ...create("First practical"), version: "archived-revision" };
+  const record = {
+    ...create("First practical"),
+    version: "archived-revision",
+    ach: undefined,
+  };
   await put("experiments", [record]);
   assert.deepEqual(await get("experiments"), [record]);
   assert.ok(valid(record));
@@ -14,7 +18,7 @@ test("versioned notebook round trip preserves historical revision", async () => 
   assert.equal(valid({ ...record, events: [{}] }), false);
 });
 test("provenance required and no biological results emitted", () => {
-  assert.equal(evidence.length, 0);
-  assert.equal(hasProvenance({ source: "https://example.org" }), false);
+  assert.ok(evidence.length > 0 && evidence.every(hasProvenance));
+  assert.equal(hasProvenance({ url: "https://example.org" }), false);
   assert.equal(engine.snapshot().tension, null);
 });

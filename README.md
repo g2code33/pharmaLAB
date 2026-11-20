@@ -1,6 +1,6 @@
 # PharmaLab
 
-Independent virtual pharmacology laboratory for local experiment setup and documentation. Phase 1 **does not simulate tissue responses**. No account, backend or PharmaTRACK installation is needed.
+Independent virtual pharmacology laboratory for local experiment setup and documentation. The [GP-ACH-001 ACh workspace](docs/scientific/GP_ACH_SCIENTIFIC_SPECIFICATION.md) calculates bath concentrations and compares published observations. Phase 1 **does not generate an uncalibrated tissue response**. No account, backend or PharmaTRACK installation is needed.
 
 ## Run the workspace
 

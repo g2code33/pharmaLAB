@@ -1,4 +1,8 @@
-# Phase 1 status
+# Implementation status
+
+**Current:** [GP-ACH-001 scientific review](scientific/GP_ACH_SCIENTIFIC_SPECIFICATION.md). The ACh workspace calculates bath concentrations and replays source-attributed endpoints. Isometric force and kinetics remain uncalibrated.
+
+## Historical foundation release (before GP-ACH-001)
 
 **Implemented:** React dashboard and nine navigation destinations, local notebooks, setup events, notes, annotations, manual save, duplicate, confirmed reset, JSON backups, text reports, theme and local preferences. Organ-bath SVG and notebook use the same target preparation. Browser checks exercise real IndexedDB and service-worker reload with networking disabled.
 

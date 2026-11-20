@@ -19,13 +19,14 @@ test("instrument controls, safe reset and display preferences", async ({
   await page.getByRole("button", { name: "New experiment" }).click();
   await page.getByLabel("Experiment name").fill("Instrument check");
   await page.getByRole("button", { name: "Start experiment" }).click();
-  await page
-    .getByRole("combobox", { name: "Compound", exact: true })
-    .selectOption("Atropine");
+  await page.getByLabel("Stock concentration", { exact: true }).fill("100");
+  await page.getByLabel("Addition volume (mL)").fill("1");
+  await page.getByRole("button", { name: "Add ACh" }).click();
   await page.getByRole("button", { name: "Wash preparation" }).click();
-  await page.getByRole("button", { name: "Log drug addition" }).click();
   await page.getByText("Administration history", { exact: true }).click();
-  await expect(page.locator(".history")).toContainText("Atropine");
+  await expect(
+    page.locator("details").filter({ hasText: "Administration history" }),
+  ).toContainText("Full wash");
   for (const n of ["Start", "Pause", "Resume", "Stop"])
     await page.getByRole("button", { name: n, exact: true }).click();
   await page.getByLabel("Time scale").selectOption("120 s");

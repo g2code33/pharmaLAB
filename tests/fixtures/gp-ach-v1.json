@@ -1,0 +1,230 @@
+{
+  "version": "GP-ACH-001/1",
+  "parameters": {
+    "version": "gp-ach-params/1",
+    "preparation": "MPLM",
+    "recording": "isometric",
+    "parameters": {
+      "EC50": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "M",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "pEC50": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "−log10(M)",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "Emax": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": 2.6,
+        "units": "g",
+        "uncertainty": {
+          "kind": "SEM",
+          "value": 0.2
+        },
+        "source": "B-mplm-v1",
+        "context": {
+          "temperatureC": 37,
+          "volumeMl": 30,
+          "solution": "Krebs-bicarbonate (mM): NaCl 118, KCl 4.7, CaCl2 2.5, MgCl2 1.2, NaH2PO4 1.2, NaHCO3 25, glucose 11, choline chloride 0.3",
+          "gas": "95% O2 / 5% CO2",
+          "equilibrationMin": 60,
+          "exposureS": 10,
+          "testedRangeM": [1e-9, 0.0001],
+          "application": "Non-cumulative; 30–60 mL wash, superfusion between doses",
+          "loadG": 1
+        },
+        "classification": "Directly measured",
+        "calibration": "reference only",
+        "validation": "unvalidated"
+      },
+      "Hill": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "1",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "baseline": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "g",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "onset": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "s",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "timeToPeak": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "s",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "phasic": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "g",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "fade": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "g",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "tonic": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "g",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "recovery": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "s",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      },
+      "repeatedExposure": {
+        "preparation": "MPLM",
+        "recording": "isometric",
+        "value": null,
+        "units": "1",
+        "uncertainty": null,
+        "source": null,
+        "context": null,
+        "classification": null,
+        "calibration": "pending",
+        "validation": "unvalidated"
+      }
+    },
+    "datasets": ["B-mplm-v1"]
+  },
+  "initialMl": 30,
+  "bath": {
+    "nominalM": 0,
+    "volumeMl": 30
+  },
+  "conditions": {
+    "temperatureC": null,
+    "gas": null,
+    "solution": "unspecified; not a reproduction of a paper"
+  },
+  "instrument": {
+    "gain": 2,
+    "sensitivity": 1,
+    "zeroG": 0,
+    "driftPerS": 0,
+    "noiseAmplitude": 0,
+    "sampleHz": 1,
+    "calibration": "ideal display, not calibrated"
+  },
+  "assumptions": "ideal-mixing/no-hydrolysis/1",
+  "analysis": "mass balance v1; no force fit",
+  "state": "stopped",
+  "history": [
+    {
+      "kind": "start",
+      "at": "2026-11-20T09:00:00.000Z",
+      "volumeMl": 30,
+      "nominalM": 0
+    },
+    {
+      "kind": "add",
+      "stockM": 0.0001,
+      "additionMl": 0.3,
+      "at": "2026-11-20T09:00:01.000Z",
+      "nominalM": 9.900990099009902e-7,
+      "volumeMl": 30.3
+    },
+    {
+      "kind": "pause",
+      "at": "2026-11-20T09:00:02.000Z",
+      "nominalM": 9.900990099009902e-7,
+      "volumeMl": 30.3
+    },
+    {
+      "kind": "wash",
+      "at": "2026-11-20T09:00:03.000Z",
+      "nominalM": 0,
+      "volumeMl": 30
+    },
+    {
+      "kind": "stop",
+      "at": "2026-11-20T09:00:04.000Z",
+      "nominalM": 0,
+      "volumeMl": 30
+    }
+  ],
+  "results": {
+    "tissueM": 0,
+    "forceG": null,
+    "signal": null,
+    "recovery": "unknown after wash"
+  }
+}

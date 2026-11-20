@@ -1,3 +1,5 @@
+import { AChControls, EvidenceReplay } from "./laboratory/ACh";
+import { apply, type Run } from "./simulation/ach/run";
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -98,6 +100,7 @@ function download(name: string, text: string, type = "application/json") {
   setTimeout(() => URL.revokeObjectURL(u), 1000);
 }
 function App() {
+  const [openRevision, setOpenRevision] = useState(0);
   const trigger = useRef<HTMLElement | null>(null);
   const [clock, setClock] = useState<SessionClock>({ elapsed: 0, since: null });
   const [query, Q] = useState("");
@@ -115,7 +118,7 @@ function App() {
     [input, I] = useState(""),
     [detail, H] = useState(""),
     [rec, S] = useState("Stopped"),
-    [drug, J] = useState<string>(drugs[0]),
+    [mode, setMode] = useState("Simulation"),
     [online, O] = useState(navigator.onLine),
     [zoom, Z] = useState(false),
     [storageError, SE] = useState(false);
@@ -191,9 +194,30 @@ function App() {
     A(a);
   }
   function open(e: Experiment) {
+    setOpenRevision((n) => n + 1);
     E(structuredClone(e));
-    S("Stopped");
-    setClock({ elapsed: 0, since: null });
+    setMode("Simulation");
+    S(
+      e.ach?.state === "recording"
+        ? "Recording"
+        : e.ach?.state === "paused"
+          ? "Paused"
+          : "Stopped",
+    );
+    let elapsed = 0,
+      started: number | null = null;
+    for (const v of e.ach?.history ?? []) {
+      if (v.kind === "start" || v.kind === "resume") started = Date.parse(v.at);
+      if ((v.kind === "pause" || v.kind === "stop") && started !== null) {
+        elapsed += Date.parse(v.at) - started;
+        started = null;
+      }
+    }
+    setClock({
+      elapsed:
+        elapsed + (started === null ? 0 : Math.max(0, Date.now() - started)),
+      since: started === null ? null : performance.now(),
+    });
     nav("Laboratory");
   }
   function event(text: string) {
@@ -208,7 +232,31 @@ function App() {
       G("Could not save to local storage. Export a backup before closing."),
     );
   }
+  function updateRun(r: Run, text: string) {
+    if (exp)
+      E({
+        ...exp,
+        ach: r,
+        parameters: [r.parameters.version],
+        datasets: [...r.parameters.datasets],
+        events: [...exp.events, { at: new Date().toISOString(), text }],
+      });
+  }
   function changeRec(s: string) {
+    if (exp?.ach) {
+      const kind =
+        s === "Stopped"
+          ? "stop"
+          : s === "Paused"
+            ? "pause"
+            : exp.ach.state === "paused"
+              ? "resume"
+              : "start";
+      updateRun(
+        apply(exp.ach, { kind }),
+        `Recording ${s.toLowerCase()} (no calibrated force)`,
+      );
+    }
     const at = performance.now();
     setClock((c) => ({
       elapsed:
@@ -218,7 +266,7 @@ function App() {
       since: s === "Recording" ? at : null,
     }));
     S(s);
-    event(`Recording ${s.toLowerCase()} (no signal)`);
+    if (!exp?.ach) event(`Recording ${s.toLowerCase()} (no signal)`);
   }
   const latest = all[0];
   const status = storageError
@@ -595,7 +643,11 @@ function App() {
                   <h2>Guinea pig ileum</h2>
                   {[
                     ["Species", "Guinea pig (Cavia porcellus)"],
-                    ["Preparation", "Isolated longitudinal ileum"],
+                    [
+                      "Preparation",
+                      exp?.ach?.parameters.preparation ??
+                        "Isolated longitudinal ileum",
+                    ],
                     ["Recording method", "Isometric tension recording"],
                     ["Protocol", "Independent exploration"],
                     ["Tissue status", "Model awaiting validation"],
@@ -613,7 +665,7 @@ function App() {
                     <h2>Organ bath assembly</h2>
                   </div>
                   <div style={{ transform: `scale(${zoom ? 1.13 : 1})` }}>
-                    <Bath state={engine.snapshot()} />
+                    <Bath state={engine.snapshot(exp?.ach)} />
                   </div>
                   <small className="resting">
                     Illustrative apparatus · resting tissue
@@ -629,159 +681,109 @@ function App() {
                 <section className="panel dosage">
                   <div className="mini">CONTROL BANK</div>
                   <h2>Drug administration</h2>
-                  <p>
-                    {pref.Difficulty === "Beginner"
-                      ? "Choose a compound and enter your setup. Actions are logged without generating a tissue response."
-                      : "Manual setup · no calibrated response model."}
-                  </p>
-                  <fieldset disabled={!exp}>
-                    <div className="fields">
-                      <label>
-                        Compound
-                        <select
-                          value={drug}
-                          onChange={(e) => J(e.target.value)}
-                        >
-                          {drugs.map((d) => (
-                            <option key={d}>{d}</option>
-                          ))}
-                        </select>
-                      </label>
-                      {[
-                        "Stock concentration",
-                        "Desired final concentration",
-                        "Addition volume",
-                        "Bath volume",
-                      ].map((k) => (
-                        <label key={k}>
-                          {k}
-                          <input
-                            placeholder="Value and units"
-                            value={exp?.conditions[k] || ""}
-                            onChange={(e) =>
-                              exp &&
-                              E({
-                                ...exp,
-                                conditions: {
-                                  ...exp.conditions,
-                                  [k]: e.target.value,
-                                },
-                              })
-                            }
-                          />
-                        </label>
-                      ))}
-                    </div>
-                    <small>Drug category: awaiting evidence</small>
-                    <div className="actions">
-                      <button
-                        onClick={() =>
-                          event(
-                            `Add drug: ${drug}; setup: ${JSON.stringify(exp?.conditions)}`,
-                          )
-                        }
-                      >
-                        Log drug addition
-                      </button>
-                      <button
-                        onClick={() => event("Wash preparation requested")}
-                      >
-                        Wash preparation
-                      </button>
-                    </div>
-                  </fieldset>
-                  {exp && (
-                    <details className="history">
-                      <summary>Administration history</summary>
-                      {exp.events.filter((e) =>
-                        /^(Add drug:|Wash preparation)/.test(e.text),
-                      ).length ? (
-                        exp.events
-                          .filter((e) =>
-                            /^(Add drug:|Wash preparation)/.test(e.text),
-                          )
-                          .map((e, i) => (
-                            <p key={i}>
-                              <small>
-                                {new Date(e.at).toLocaleTimeString()}
-                              </small>
-                              {e.text
-                                .split("; setup:")[0]
-                                .replace(/^Add drug: /, "Compound · ")}
-                            </p>
-                          ))
+                  <label>
+                    Workspace mode
+                    <select
+                      value={mode}
+                      onChange={(e) => setMode(e.target.value)}
+                    >
+                      <option>Simulation</option>
+                      <option>Evidence replay</option>
+                    </select>
+                  </label>
+                  {mode === "Evidence replay" ? (
+                    <EvidenceReplay />
+                  ) : (
+                    <>
+                      <p>
+                        GP-ACH-001 · Isometric response not calibrated. Bath
+                        concentration is calculated; force is withheld.
+                      </p>
+                      {exp?.ach ? (
+                        <AChControls
+                          key={openRevision}
+                          run={exp.ach}
+                          onChange={updateRun}
+                        />
                       ) : (
-                        <p>No administrations logged.</p>
+                        <p>
+                          Start a new experiment to administer ACh. Historical
+                          notebook records are not upgraded.
+                        </p>
                       )}
-                    </details>
+                    </>
                   )}
                 </section>
               </div>
-              <section className="panel recorder">
-                <div className="cardhead">
-                  <div>
-                    <div className="mini">CHANNEL 01 / ISOMETRIC</div>
-                    <h2>Live recording</h2>
+              {mode === "Simulation" && (
+                <section className="panel recorder">
+                  <div className="cardhead">
+                    <div>
+                      <div className="mini">CHANNEL 01 / ISOMETRIC</div>
+                      <h2>Live recording</h2>
+                    </div>
+                    {badge(rec)}
                   </div>
-                  {badge(rec)}
-                </div>
-                <RecordingPlot
-                  clock={exp ? clock : undefined}
-                  scale={exp?.recording.scale}
-                />
-                <small>Baseline unavailable · No physiological data</small>
-                <div className="actions">
-                  {["Start", "Pause", "Resume", "Stop"].map((a, i) => (
-                    <button
-                      key={a}
-                      disabled={
-                        !exp ||
-                        ![
-                          rec === "Stopped",
-                          rec === "Recording",
-                          rec === "Paused",
-                          rec !== "Stopped",
-                        ][i]
-                      }
-                      onClick={() =>
-                        changeRec(
-                          ["Recording", "Paused", "Recording", "Stopped"][i],
-                        )
-                      }
-                    >
-                      {a}
-                    </button>
-                  ))}
-                  <button disabled>Export signal</button>
-                </div>
-                {exp && (
-                  <div className="fields">
-                    <label>
-                      Time scale
-                      <select
-                        value={exp.recording.scale}
-                        onChange={(e) =>
-                          E({
-                            ...exp,
-                            recording: {
-                              ...exp.recording,
-                              scale: e.target.value,
-                            },
-                          })
+                  <RecordingPlot
+                    clock={exp ? clock : undefined}
+                    run={exp?.ach}
+                    scale={exp?.recording.scale}
+                  />
+                  <small>Baseline unavailable · No physiological data</small>
+                  <div className="actions">
+                    {["Start", "Pause", "Resume", "Stop"].map((a, i) => (
+                      <button
+                        key={a}
+                        disabled={
+                          !exp ||
+                          exp.ach?.state === "stopped" ||
+                          ![
+                            rec === "Stopped",
+                            rec === "Recording",
+                            rec === "Paused",
+                            rec !== "Stopped" || exp.ach?.state === "ready",
+                          ][i]
+                        }
+                        onClick={() =>
+                          changeRec(
+                            ["Recording", "Paused", "Recording", "Stopped"][i],
+                          )
                         }
                       >
-                        {["30 s", "60 s", "120 s"].map((k) => (
-                          <option key={k}>{k}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Recording sensitivity
-                      <input disabled value="Awaiting calibration" />
-                    </label>
+                        {a}
+                      </button>
+                    ))}
+                    <button disabled>Export signal</button>
                   </div>
-                )}
-              </section>
+                  {exp && (
+                    <div className="fields">
+                      <label>
+                        Time scale
+                        <select
+                          value={exp.recording.scale}
+                          onChange={(e) =>
+                            E({
+                              ...exp,
+                              recording: {
+                                ...exp.recording,
+                                scale: e.target.value,
+                              },
+                            })
+                          }
+                        >
+                          {["30 s", "60 s", "120 s"].map((k) => (
+                            <option key={k}>{k}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Recording sensitivity
+                        <input disabled value="Awaiting calibration" />
+                      </label>
+                    </div>
+                  )}
+                </section>
+              )}
               {exp && (
                 <section className="panel">
                   <h2>Experiment notebook</h2>
@@ -827,8 +829,8 @@ function App() {
                         : "Preparation method awaiting review."}
                   </p>
                   <small>
-                    Conditions, protocols and sensitivity: awaiting evidence. No
-                    validated model.
+                    Preparation-specific evidence is available for ACh in guinea
+                    pig ileum. No validated force model.
                   </small>
                   {detail === tissues[0] && (
                     <button onClick={() => nav("Laboratory")}>
@@ -868,7 +870,11 @@ function App() {
                   <button className="listitem" key={d} onClick={() => H(d)}>
                     <span className="refnum">RX / 0{drugs.indexOf(d) + 1}</span>
                     <b className="grow left">{d}</b>
-                    {badge("Awaiting evidence")}
+                    {badge(
+                      d === drugs[0]
+                        ? "Awaiting calibration"
+                        : "Awaiting evidence",
+                    )}
                     <ChevronRight size={15} />
                   </button>
                 ))}
@@ -876,9 +882,9 @@ function App() {
                 <div key={detail} className="panel detailPanel">
                   <h2>{detail}</h2>
                   <p>
-                    Class, receptor target, action, stock, molecular weight,
-                    concentration range and tissue-specific effects await
-                    evidence review.
+                    {detail === drugs[0]
+                      ? "ACh exposure calculations and preparation-specific evidence are available. Isometric force is not calibrated."
+                      : "Compound parameters await evidence review."}
                   </p>
                 </div>
               )}
@@ -976,6 +982,9 @@ function App() {
                                 e.model,
                                 e.version,
                                 "No scientific signal recorded.",
+                                ...(e.ach
+                                  ? [JSON.stringify(e.ach, null, 2)]
+                                  : []),
                                 e.notes,
                                 ...e.events.map((v) => v.at + " " + v.text),
                               ].join("\n"),
@@ -1007,15 +1016,10 @@ function App() {
           {page === "Analysis" && (
             <section className="panel">
               <RecordingPlot
+                run={all.find((e) => e.id === detail)?.ach}
                 scale={all.find((e) => e.id === detail)?.recording.scale}
               />
-              <div className="mini">SCIENTIFIC PROVENANCE</div>
-              <h2>Evidence register</h2>
-              <p>No verified datasets have been added.</p>
-              <small>
-                Dataset ID · Parameter · Species and tissue · Original value and
-                units · Source · Licence · Validation
-              </small>
+              <EvidenceReplay />
             </section>
           )}
           {page === "Settings" && (
@@ -1161,6 +1165,13 @@ function App() {
                     created: exp.created,
                     model: exp.model,
                     version: exp.version,
+                    ...(!exp.ach
+                      ? {
+                          ach: undefined,
+                          parameters: exp.parameters,
+                          datasets: exp.datasets,
+                        }
+                      : {}),
                   };
                   await save(v);
                   open(v);
