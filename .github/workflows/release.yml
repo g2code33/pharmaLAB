@@ -17,7 +17,7 @@ jobs:
       mode: ${{ steps.policy.outputs.mode }}
       tag: ${{ steps.policy.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with: {fetch-depth: 0, persist-credentials: false}
       - id: policy
         env:
@@ -50,9 +50,9 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with: {persist-credentials: false}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {path: incoming, pattern: 'pharmalab-*'}
       - env: {TARGET: '${{ inputs.target || ''all'' }}'}
         run: node scripts/delivery.mjs collect incoming "$TARGET" verified
@@ -66,9 +66,9 @@ jobs:
       cancel-in-progress: false
     permissions: {contents: write}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with: {fetch-depth: 0, persist-credentials: false}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {path: incoming, pattern: 'pharmalab-*'}
       - run: node scripts/delivery.mjs collect incoming all verified
       - name: Require configured reviewers for manual stable publication

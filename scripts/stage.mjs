@@ -40,6 +40,10 @@ if (process.env.GITHUB_OUTPUT)
   fs.appendFileSync(process.env.GITHUB_OUTPUT, `artifact=${id}\n`);
 const summary = `${target} | verified | ${sign} | ${file} | ${fs.statSync(input).size} bytes\n`;
 console.log(summary);
+if (process.env.GITHUB_ACTIONS)
+  console.log(
+    `::notice title=Verified package::${file} | ${fs.statSync(input).size} bytes | sha256 ${sums.split(" ")[0]}`,
+  );
 if (process.env.GITHUB_STEP_SUMMARY)
   fs.appendFileSync(
     process.env.GITHUB_STEP_SUMMARY,
