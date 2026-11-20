@@ -10,10 +10,14 @@ Start a named experiment, enter a setup, log actions and annotations, then selec
 
 ## Desktop
 
-Install Rust stable, Node and the [Tauri 2 platform prerequisites](https://v2.tauri.app/start/prerequisites/). On Windows these include MSVC build tools; Ubuntu requires WebKitGTK 4.1 development libraries. `npm run tauri dev` starts the native shell; `npm run tauri build` packages the frontend and SQLite plugin. Windows is configured for the offline WebView2 installer. Linux machines need the distribution runtime libraries installed. Packaging requires network access on the build machine, not for routine application use. A manually triggered Windows/Linux build workflow is included; installers have not been tested here.
+Install Rust stable, Node and the [Tauri 2 platform prerequisites](https://v2.tauri.app/start/prerequisites/). On Windows these include MSVC build tools; Ubuntu requires WebKitGTK 4.1 development libraries. `npm run tauri dev` starts the native shell; `npm run tauri build` packages the frontend and SQLite plugin. Windows is configured for the offline WebView2 installer. Linux machines need the distribution runtime libraries installed. Packaging requires network access on the build machine, not for routine application use. The verification workflow builds and smoke-tests native packages on Windows and Ubuntu runners. Consult its actual run status before distributing any installer.
 
 ## Verification
 
 `npm test` runs contract and IndexedDB tests. `npm run build`, `npx playwright install chromium`, then `npm run test:e2e` checks the production workspace, navigation, mobile width and offline reload. Set `CHROMIUM_PATH` to use an existing Chromium executable.
 
 See [implementation status](docs/IMPLEMENTATION_STATUS.md), [architecture](docs/ARCHITECTURE.md) and the specifications in `docs/`.
+
+## Build and release engineering
+
+See [build instructions](docs/BUILD-INSTRUCTIONS.md), [release policy and recovery commands](docs/RELEASE-PIPELINE.md), [updates](docs/UPDATE-ARCHITECTURE.md), [security](docs/SECURITY.md), [engineering profile](docs/PROJECT-ENGINEERING-PROFILE.md) and [decisions](docs/DECISIONS.md). Main deliveries are commit-specific prereleases; only authorized version releases are stable.
