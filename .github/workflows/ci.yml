@@ -1,0 +1,125 @@
+name: Product verification
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      target: {type: string, default: all}
+    secrets:
+      WINDOWS_PFX_BASE64: {required: false}
+      WINDOWS_PFX_PASSWORD: {required: false}
+permissions: {contents: read}
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.22.3, cache: npm}
+      - run: npm ci
+      - run: npm run check && npm test && npm audit --audit-level=high
+      - name: Static secret scan (pinned scanner; no redacted values in summaries)
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.24.3
+          "$(go env GOPATH)/bin/gitleaks" git --redact --no-banner
+      - name: Native vulnerability scan
+        run: |
+          cargo install cargo-audit --version 0.22.1 --locked
+          cargo audit --file src-tauri/Cargo.lock
+      - id: plan
+        env: {TARGET: '${{ inputs.target || ''all'' }}'}
+        run: |
+          case "$TARGET" in
+            all) m='["linux","windows"]';;
+            windows|linux) m="[\"$TARGET\"]";;
+            web) m='[]';;
+            *) exit 1;;
+          esac
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+  web:
+    needs: validate
+    runs-on: ubuntu-22.04
+    env: {PHARMA_TARGET: web}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.22.3, cache: npm}
+      - run: npm ci && npm run build && npm run verify:web
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - id: stage
+        if: ${{ !inputs.target || inputs.target == 'all' || inputs.target == 'web' }}
+        run: |
+          (cd dist && zip -qr ../web.zip .)
+          unzip -t web.zip
+          unzip -q web.zip -d "$RUNNER_TEMP/site"
+          node scripts/verify-web.mjs "$RUNNER_TEMP/site"
+          node scripts/stage.mjs web web.zip
+      - uses: actions/upload-artifact@v4
+        if: steps.stage.outcome == 'success'
+        with:
+          name: ${{ steps.stage.outputs.artifact }}
+          path: release-out/*/*
+          if-no-files-found: error
+  desktop:
+    needs: [validate, web]
+    if: ${{ inputs.target != 'web' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.validate.outputs.matrix) }}
+    runs-on: ${{ matrix.target == 'windows' && 'windows-2022' || 'ubuntu-24.04' }}
+    env:
+      PHARMA_TARGET: ${{ matrix.target }}
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.22.3, cache: npm}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock','rust-toolchain.toml') }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf desktop-file-utils xdotool xvfb dbus-x11
+      - run: npm ci
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PFX: ${{ secrets.WINDOWS_PFX_BASE64 }}
+          PFX_PASS: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+        run: ./scripts/sign-windows.ps1
+      - run: npm run build
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+      - name: Package Linux (locked)
+        if: runner.os == 'Linux'
+        run: npm run tauri build -- --ci --bundles deb -- --locked
+      - name: Package Windows (locked)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $opts=@(); if($env:SIGN_STATE -eq 'signed'){$opts=@('--config',"$env:RUNNER_TEMP/sign.json")}
+          npm run tauri build -- --ci --bundles nsis @opts -- --locked
+          exit $LASTEXITCODE
+      - id: linux
+        if: runner.os == 'Linux'
+        run: bash scripts/linux-package.sh
+      - id: windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/windows-package.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.linux.outputs.artifact || steps.windows.outputs.artifact }}
+          path: release-out/*/*
+          if-no-files-found: error
+          compression-level: 0
