@@ -1,0 +1,11 @@
+[package]
+name="pharmalab"
+version="0.1.0"
+edition="2021"
+description="Offline virtual pharmacology laboratory"
+authors=["PharmaLab contributors"]
+[build-dependencies]
+tauri-build={version="2",features=[]}
+[dependencies]
+tauri={version="2",features=[]}
+rusqlite={version="=0.43.0",features=["bundled"]}

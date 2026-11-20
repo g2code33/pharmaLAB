@@ -1,0 +1,10 @@
+# Phase 1B workstation interface
+
+The existing React workspace still owns navigation, notebook drafts, persistence and recording controls. The new presentation layer adds no dependencies, network resources, WebGL requirement or schema migrations.
+
+- **Dashboard:** instrument plate, direct laboratory launch, illustrated research module links, most recent local notebook and workstation status. Module counts describe the catalogue, not validated models.
+- **Laboratory:** preparation notes, resting apparatus, manual administration, collapsible administration history, recording desk and notebook. At narrower widths the control bank moves below the instrument, then the instrument moves first. Zoom/reset changes presentation only.
+- **Reference and records:** preparation atlas, searchable drug catalogue, experiment notebook, signal inspection, report archive and configuration desk. These use the existing evidence and experiment contracts.
+- **Motion:** CSS transform/opacity for entry and instrument details. The mounting state comes from `SimulationState`. Liquid, lamp and gas bubbles are illustrative; no tissue response is animated. The SVG pauses when offscreen or the document is hidden. System reduced motion, the local reduced-motion preference and low graphics quality disable motion; low animation quality freezes apparatus details.
+- **Recording:** the cursor is elapsed operator session time, not an acquired signal. `RecordingPlot` updates independently of the apparatus and workspace. No tension units, samples, baseline or biological result are invented. Signal export and 3D remain unavailable rather than advertising unsupported functionality.
+- **Checks:** `npm run check`, `npm test`, `npm run build`, `npm run verify:web`, `npm run test:e2e`. The browser checks include offline restart, drug lookup, recording transitions, notes, reset confirmation, theme and performance preferences, responsive widths and console errors. Real integrated-GPU hardware remains a separate qualification target.

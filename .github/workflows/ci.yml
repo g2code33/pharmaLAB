@@ -1,0 +1,153 @@
+name: Product verification
+on:
+  pull_request:
+  workflow_call:
+    inputs:
+      target: {type: string, default: all}
+    secrets:
+      WINDOWS_PFX_BASE64: {required: false}
+      WINDOWS_PFX_PASSWORD: {required: false}
+permissions: {contents: read}
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with: {node-version: 22.22.3, cache: npm}
+      - run: npm ci
+      - run: npm run check && npm test && npm audit --audit-level=high
+      - name: Lint both release and build workflows
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint" -format '{{range .}}::error file={{.Filepath}},line={{.Line}}::{{.Message}}{{println}}{{end}}' 
+      - name: Static secret scan (pinned scanner; no redacted values in summaries)
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.24.3
+          "$(go env GOPATH)/bin/gitleaks" git --redact --no-banner
+      - id: plan
+        env: {TARGET: '${{ inputs.target || ''all'' }}'}
+        run: |
+          case "$TARGET" in
+            all) m='["linux","windows"]';;
+            windows|linux) m="[\"$TARGET\"]";;
+            web) m='[]';;
+            *) exit 1;;
+          esac
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+  native-audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with: {persist-credentials: false}
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2
+        with: {tool: cargo-audit@0.22.1}
+      - name: Audit complete native lockfile
+        run: |
+          set -euo pipefail
+          cargo audit --file src-tauri/Cargo.lock --json > "$RUNNER_TEMP/audit.json" || {
+            jq -r '.vulnerabilities.list[]|"::error::\(.advisory.id) \(.package.name) \(.package.version): \(.advisory.title)"' "$RUNNER_TEMP/audit.json"
+            exit 1
+          }
+  web:
+    needs: validate
+    runs-on: ubuntu-22.04
+    env: {PHARMA_TARGET: web}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with: {node-version: 22.22.3, cache: npm}
+      - run: npm ci && npm run build && npm run verify:web
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - id: stage
+        if: ${{ !inputs.target || inputs.target == 'all' || inputs.target == 'web' }}
+        run: |
+          (cd dist && zip -qr ../web.zip .)
+          unzip -t web.zip
+          unzip -q web.zip -d "$RUNNER_TEMP/site"
+          node scripts/verify-web.mjs "$RUNNER_TEMP/site"
+          node scripts/stage.mjs web web.zip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.stage.outcome == 'success'
+        with:
+          name: ${{ steps.stage.outputs.artifact }}
+          path: release-out/${{ steps.stage.outputs.artifact }}/
+          overwrite: true
+          if-no-files-found: error
+  desktop:
+    needs: [validate, web]
+    if: ${{ inputs.target != 'web' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.validate.outputs.matrix) }}
+    runs-on: ${{ matrix.target == 'windows' && 'windows-2022' || 'ubuntu-24.04' }}
+    env:
+      PHARMA_TARGET: ${{ matrix.target }}
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with: {node-version: 22.22.3, cache: npm}
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock','rust-toolchain.toml') }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf desktop-file-utils xdotool xvfb dbus-x11
+      - run: npm ci
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PFX: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && secrets.WINDOWS_PFX_BASE64 || '' }}
+          PFX_PASS: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && secrets.WINDOWS_PFX_PASSWORD || '' }}
+        run: ./scripts/sign-windows.ps1
+      - run: npm run build
+      - run: cargo clippy --release --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+      - run: cargo test --release --manifest-path src-tauri/Cargo.toml --locked
+      - name: Package Linux (locked)
+        if: runner.os == 'Linux'
+        run: npm run tauri build -- --ci --bundles deb -- --locked
+      - name: Package Windows (locked)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $opts=@(); if($env:SIGN_STATE -eq 'signed'){$opts=@('--config',"$env:RUNNER_TEMP/sign.json")}
+          npm run tauri build -- --ci --bundles nsis @opts -- --locked
+          exit $LASTEXITCODE
+      - id: linux
+        if: runner.os == 'Linux'
+        run: bash scripts/linux-package.sh
+      - id: windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/windows-package.ps1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.linux.outputs.artifact || steps.windows.outputs.artifact }}
+          path: release-out/${{ steps.linux.outputs.artifact || steps.windows.outputs.artifact }}/
+          overwrite: true
+          if-no-files-found: error
+          compression-level: 0
+  verify-downloads:
+    needs: [web, desktop, native-audit]
+    if: ${{ !cancelled() && needs.web.result == 'success' && needs.native-audit.result == 'success' && (needs.desktop.result == 'success' || (inputs.target == 'web' && needs.desktop.result == 'skipped')) }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {path: incoming, pattern: 'pharmalab-*'}
+      - env: {TARGET: '${{ inputs.target || ''all'' }}'}
+        run: node scripts/delivery.mjs collect incoming "$TARGET" verified
