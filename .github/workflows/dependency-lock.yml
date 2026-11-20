@@ -15,4 +15,4 @@ jobs:
           if-no-files-found: error
       # Temporary transport of public lock data for restricted development hosts.
       - run: |
-          gzip -nc src-tauri/Cargo.lock | base64 -w0 | fold -w 12000 | awk '{print "::notice title=lock-" NR "::" $0}'
+          gzip -nc src-tauri/Cargo.lock | base64 -w0 | fold -w 3500 | awk '{print "::notice title=lock-" NR "::" $0}'
