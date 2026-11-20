@@ -1,9 +1,12 @@
+import { OPTION, validTrial, type Trial } from "./ach/protocol";
+import { sources } from "./ach/protocols";
 import { createRun, validRun, VERSION, type Run } from "./ach/run";
 import { tissues } from "../catalogue";
 export { tissues, drugs } from "../catalogue";
 export interface SimulationState {
   status: "AWAITING SCIENTIFIC VALIDATION";
   tension: number | null;
+  relative?: number;
   mounted: boolean;
 }
 export interface ScientificEngine {
@@ -17,6 +20,7 @@ export const engine: ScientificEngine = {
   }),
 };
 export interface Experiment {
+  trial?: Trial;
   ach?: Run;
   schema: 1;
   id: string;
@@ -56,6 +60,16 @@ export function valid(x: any): x is Experiment {
   return (
     !!x &&
     x.schema === 1 &&
+    (x.trial === undefined
+      ? x.version !== OPTION
+      : x.version === OPTION &&
+        !x.ach &&
+        validTrial(x.trial) &&
+        x.parameters?.length === 1 &&
+        x.parameters[0] === OPTION &&
+        x.model === tissues[0] &&
+        x.datasets?.length === 1 &&
+        x.datasets[0] === sources[(x.trial as Trial).plan.context].id) &&
     (x.ach === undefined
       ? x.version !== VERSION
       : x.version === VERSION && validRun(x.ach)) &&

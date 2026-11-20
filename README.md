@@ -1,6 +1,6 @@
 # PharmaLab
 
-Independent virtual pharmacology laboratory for local experiment setup and documentation. The [GP-ACH-001 ACh workspace](docs/scientific/GP_ACH_SCIENTIFIC_SPECIFICATION.md) calculates bath concentrations and compares published observations. Phase 1 **does not generate an uncalibrated tissue response**. No account, backend or PharmaTRACK installation is needed.
+Local virtual pharmacology laboratory for guinea-pig ileum and acetylcholine. The [Option A protocol recorder](docs/scientific/GP_ACH_OPTION_A.md) simulates phasic contraction, fade, sustained response and recovery. Its default MPLM profile uses a reported isometric potency midpoint; the time course and optional force scale are **provisional assumptions, not independently validated predictions**. The [original bath-only notebook](docs/scientific/GP_ACH_SCIENTIFIC_SPECIFICATION.md) remains available. No account or backend required.
 
 ## Run the workspace
 

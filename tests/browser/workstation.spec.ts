@@ -17,6 +17,7 @@ test("instrument controls, safe reset and display preferences", async ({
   await expect(page.getByRole("heading", { name: "Histamine" })).toBeVisible();
   await nav("Laboratory");
   await page.getByRole("button", { name: "New experiment" }).click();
+  await page.getByLabel("Experiment type").selectOption("Simulation");
   await page.getByLabel("Experiment name").fill("Instrument check");
   await page.getByRole("button", { name: "Start experiment" }).click();
   await page.getByLabel("Stock concentration", { exact: true }).fill("100");

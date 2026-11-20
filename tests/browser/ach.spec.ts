@@ -16,6 +16,7 @@ test("evidence comparison is not a simulated recording; target dose uses current
     page.getByRole("heading", { name: "Live recording" }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "New experiment" }).click();
+  await page.getByLabel("Experiment type").selectOption("Simulation");
   await page.getByLabel("Experiment name").fill("Target ACh");
   await page.getByRole("button", { name: "Start experiment" }).click();
   await page.getByLabel("Stock concentration", { exact: true }).fill("31");

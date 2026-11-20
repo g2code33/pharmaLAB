@@ -1,6 +1,6 @@
 # Implementation status
 
-**Current:** [GP-ACH-001 scientific review](scientific/GP_ACH_SCIENTIFIC_SPECIFICATION.md). The ACh workspace calculates bath concentrations and replays source-attributed endpoints. Isometric force and kinetics remain uncalibrated.
+**Current:** [Option A implementation, source audit and gates](scientific/GP_ACH_OPTION_A.md). Four preparation contexts; deterministic provisional ACh protocol simulation, local curve review, replay and export. The original bath-only mode and saved records are unchanged. No independent biological validation or verified isometric force scale.
 
 ## Historical foundation release (before GP-ACH-001)
 

@@ -227,7 +227,11 @@ export function Bath({ state }: { state: SimulationState }) {
       </g>
       <g fill="#d0ddc4" fontFamily="monospace" fontSize="8.5" letterSpacing="1">
         <text x="353" y="31">
-          TRANSDUCER
+          {state.relative === undefined
+            ? "TRANSDUCER"
+            : state.tension === null
+              ? `${(state.relative * 100).toFixed(1)}% SIM`
+              : `${state.tension.toFixed(2)} g SIM`}
         </text>
         <text x="378" y="141">
           BATH CHAMBER

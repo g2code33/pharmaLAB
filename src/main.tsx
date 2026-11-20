@@ -1,3 +1,8 @@
+import { Plot } from "./laboratory/ProtocolPlot";
+import { sampleProtocol } from "./simulation/ach/protocol";
+import { ProtocolBench } from "./laboratory/ProtocolBench";
+import { OPTION, preset, type Trial } from "./simulation/ach/protocol";
+import { sources } from "./simulation/ach/protocols";
 import { AChControls, EvidenceReplay } from "./laboratory/ACh";
 import { apply, type Run } from "./simulation/ach/run";
 import React, { useState, useEffect, useRef } from "react";
@@ -118,7 +123,8 @@ function App() {
     [input, I] = useState(""),
     [detail, H] = useState(""),
     [rec, S] = useState("Stopped"),
-    [mode, setMode] = useState("Simulation"),
+    [mode, setMode] = useState("Protocol simulation"),
+    [newMode, setNewMode] = useState("Protocol simulation"),
     [online, O] = useState(navigator.onLine),
     [zoom, Z] = useState(false),
     [storageError, SE] = useState(false);
@@ -183,6 +189,8 @@ function App() {
     return () => clearTimeout(timer);
   }, [msg]);
   function dialog(d: string) {
+    if (d === "New experiment")
+      setNewMode(mode === "Simulation" ? mode : "Protocol simulation");
     trigger.current = document.activeElement as HTMLElement;
     I("");
     D(d);
@@ -196,7 +204,7 @@ function App() {
   function open(e: Experiment) {
     setOpenRevision((n) => n + 1);
     E(structuredClone(e));
-    setMode("Simulation");
+    setMode(e.trial ? "Protocol simulation" : "Simulation");
     S(
       e.ach?.state === "recording"
         ? "Recording"
@@ -241,6 +249,20 @@ function App() {
         datasets: [...r.parameters.datasets],
         events: [...exp.events, { at: new Date().toISOString(), text }],
       });
+  }
+  function updateTrial(trial: Trial) {
+    E((old) =>
+      old
+        ? {
+            ...old,
+            ach: undefined,
+            version: OPTION,
+            trial,
+            parameters: [trial.plan.version],
+            datasets: [sources[trial.plan.context].id],
+          }
+        : old,
+    );
   }
   function changeRec(s: string) {
     if (exp?.ach) {
@@ -621,6 +643,17 @@ function App() {
             <>
               <div className="toolbar">
                 <strong>{exp?.name || "Preparation workspace"}</strong>
+                <label>
+                  Workspace mode
+                  <select
+                    value={mode}
+                    onChange={(e) => setMode(e.target.value)}
+                  >
+                    <option disabled={!!exp?.trial}>Simulation</option>
+                    <option>Protocol simulation</option>
+                    <option>Evidence replay</option>
+                  </select>
+                </label>
                 {newBtn}
                 {exp && (
                   <>
@@ -637,84 +670,107 @@ function App() {
                   </>
                 )}
               </div>
-              <div className="labgrid">
-                <section className="panel">
-                  <div className="mini">PREPARATION 01</div>
-                  <h2>Guinea pig ileum</h2>
-                  {[
-                    ["Species", "Guinea pig (Cavia porcellus)"],
-                    [
-                      "Preparation",
-                      exp?.ach?.parameters.preparation ??
-                        "Isolated longitudinal ileum",
-                    ],
-                    ["Recording method", "Isometric tension recording"],
-                    ["Protocol", "Independent exploration"],
-                    ["Tissue status", "Model awaiting validation"],
-                    ["Bath conditions", "Not calibrated"],
-                  ].map(([k, v]) => (
-                    <p key={k}>
-                      <small>{k}</small>
-                      {v}
+              {mode === "Protocol simulation" ? (
+                exp?.trial ? (
+                  <ProtocolBench
+                    key={exp.id + ":" + openRevision}
+                    exp={exp}
+                    all={all}
+                    change={updateTrial}
+                    download={download}
+                  />
+                ) : (
+                  <section className="panel">
+                    <div className="mini">OPTION A · PROVISIONAL</div>
+                    <h2>Time-dependent ACh protocol</h2>
+                    <p>
+                      Use a fresh notebook to explore an isometric response with
+                      documented assumptions. Start with the Corbett &amp; Lees
+                      MPLM preparation. Only the potency midpoint is
+                      source-constrained; kinetics are not validated.
                     </p>
-                  ))}
-                </section>
-                <section className="panel apparatus">
-                  <div className="instrumentHead">
-                    <div className="heroLabel">INSTRUMENT 01</div>
-                    <h2>Organ bath assembly</h2>
-                  </div>
-                  <div style={{ transform: `scale(${zoom ? 1.13 : 1})` }}>
-                    <Bath state={engine.snapshot(exp?.ach)} />
-                  </div>
-                  <small className="resting">
-                    Illustrative apparatus · resting tissue
-                  </small>
-                  <div className="actions">
-                    <button onClick={() => Z(!zoom)}>
-                      Zoom {zoom ? "out" : "in"}
-                    </button>
-                    <button onClick={() => Z(false)}>Reset view</button>
-                    <button disabled>3D unavailable</button>
-                  </div>
-                </section>
-                <section className="panel dosage">
-                  <div className="mini">CONTROL BANK</div>
-                  <h2>Drug administration</h2>
-                  <label>
-                    Workspace mode
-                    <select
-                      value={mode}
-                      onChange={(e) => setMode(e.target.value)}
-                    >
-                      <option>Simulation</option>
-                      <option>Evidence replay</option>
-                    </select>
-                  </label>
-                  {mode === "Evidence replay" ? (
-                    <EvidenceReplay />
-                  ) : (
-                    <>
+                    {exp?.ach && !exp.ach.history.length ? (
+                      <button onClick={() => updateTrial(preset())}>
+                        Configure protocol
+                      </button>
+                    ) : (
                       <p>
-                        GP-ACH-001 · Isometric response not calibrated. Bath
-                        concentration is calculated; force is withheld.
+                        Create a new experiment first. Existing recordings are
+                        preserved.
                       </p>
-                      {exp?.ach ? (
-                        <AChControls
-                          key={openRevision}
-                          run={exp.ach}
-                          onChange={updateRun}
-                        />
-                      ) : (
+                    )}
+                  </section>
+                )
+              ) : (
+                <div className="labgrid">
+                  <section className="panel">
+                    <div className="mini">PREPARATION 01</div>
+                    <h2>Guinea pig ileum</h2>
+                    {[
+                      ["Species", "Guinea pig (Cavia porcellus)"],
+                      [
+                        "Preparation",
+                        exp?.ach?.parameters.preparation ??
+                          "Isolated longitudinal ileum",
+                      ],
+                      ["Recording method", "Isometric tension recording"],
+                      ["Protocol", "Independent exploration"],
+                      ["Tissue status", "Model awaiting validation"],
+                      ["Bath conditions", "Not calibrated"],
+                    ].map(([k, v]) => (
+                      <p key={k}>
+                        <small>{k}</small>
+                        {v}
+                      </p>
+                    ))}
+                  </section>
+                  <section className="panel apparatus">
+                    <div className="instrumentHead">
+                      <div className="heroLabel">INSTRUMENT 01</div>
+                      <h2>Organ bath assembly</h2>
+                    </div>
+                    <div style={{ transform: `scale(${zoom ? 1.13 : 1})` }}>
+                      <Bath state={engine.snapshot(exp?.ach)} />
+                    </div>
+                    <small className="resting">
+                      Illustrative apparatus · resting tissue
+                    </small>
+                    <div className="actions">
+                      <button onClick={() => Z(!zoom)}>
+                        Zoom {zoom ? "out" : "in"}
+                      </button>
+                      <button onClick={() => Z(false)}>Reset view</button>
+                      <button disabled>3D unavailable</button>
+                    </div>
+                  </section>
+                  <section className="panel dosage">
+                    <div className="mini">CONTROL BANK</div>
+                    <h2>Drug administration</h2>
+                    {mode === "Evidence replay" ? (
+                      <EvidenceReplay />
+                    ) : (
+                      <>
                         <p>
-                          Start a new experiment to administer ACh. Historical
-                          notebook records are not upgraded.
+                          GP-ACH-001 · Isometric response not calibrated. Bath
+                          concentration is calculated; force is withheld.
                         </p>
-                      )}
-                    </>
-                  )}
-                </section>
-              </div>
+                        {exp?.ach ? (
+                          <AChControls
+                            key={openRevision}
+                            run={exp.ach}
+                            onChange={updateRun}
+                          />
+                        ) : (
+                          <p>
+                            Start a new experiment to administer ACh. Historical
+                            notebook records are not upgraded.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </section>
+                </div>
+              )}
               {mode === "Simulation" && (
                 <section className="panel recorder">
                   <div className="cardhead">
@@ -930,7 +986,12 @@ function App() {
                       try {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        const a = JSON.parse(await file.text());
+                        const payload = JSON.parse(await file.text());
+                        const a = Array.isArray(payload)
+                          ? payload
+                          : payload?.experiment
+                            ? [payload.experiment]
+                            : null;
                         if (!Array.isArray(a) || !a.every(valid)) throw Error();
                         const ids = new Set(all.map((v) => v.id));
                         const merged = [
@@ -981,7 +1042,12 @@ function App() {
                                 e.created,
                                 e.model,
                                 e.version,
-                                "No scientific signal recorded.",
+                                ...(e.trial
+                                  ? [
+                                      "Provisional simulated protocol; not experimental observations.",
+                                      JSON.stringify(e.trial, null, 2),
+                                    ]
+                                  : ["No scientific signal recorded."]),
                                 ...(e.ach
                                   ? [JSON.stringify(e.ach, null, 2)]
                                   : []),
@@ -1015,10 +1081,36 @@ function App() {
           )}
           {page === "Analysis" && (
             <section className="panel">
-              <RecordingPlot
-                run={all.find((e) => e.id === detail)?.ach}
-                scale={all.find((e) => e.id === detail)?.recording.scale}
-              />
+              {(() => {
+                const record = all.find((e) => e.id === detail),
+                  t = record?.trial;
+                if (!t)
+                  return (
+                    <RecordingPlot
+                      run={record?.ach}
+                      scale={record?.recording.scale}
+                    />
+                  );
+                const points = sampleProtocol(t.plan, t.elapsed, t.washAt),
+                  ys = points.map((q) => q.forceG ?? q.relative * 100);
+                return (
+                  <>
+                    <h2>{record!.name} · replay</h2>
+                    <Plot
+                      label={
+                        t.plan.knobs.scaleG
+                          ? "Simulated total force (g; assumed scale)"
+                          : "Simulated active response (%)"
+                      }
+                      xLabel="Virtual time (s)"
+                      series={points.map((q, i) => [q.s, ys[i]])}
+                      yMax={Math.max(1, ...ys)}
+                      xMin={0}
+                      xMax={Math.max(1, t.elapsed)}
+                    />
+                  </>
+                );
+              })()}
               <EvidenceReplay />
             </section>
           )}
@@ -1086,9 +1178,10 @@ function App() {
               </p>
               <h3>Scientific status</h3>
               <p>
-                The guinea pig ileum model awaits evidence review and
-                calibration. No biological simulations or validated numerical
-                results are available in this release.
+                The ACh protocol recorder generates provisional simulated
+                responses, not measured force. Absolute force requires an
+                assumed scale. No independent biological validation has been
+                performed.
               </p>
             </section>
           )}
@@ -1133,7 +1226,7 @@ function App() {
               if (e.key === "Escape" && !busy) closeModal();
               if (e.key === "Tab") {
                 const els = e.currentTarget.querySelectorAll<HTMLElement>(
-                  "input,button:not(:disabled)",
+                  "input,select,button:not(:disabled)",
                 );
                 if (e.shiftKey && document.activeElement === els[0]) {
                   e.preventDefault();
@@ -1154,6 +1247,14 @@ function App() {
               try {
                 if (modal === "New experiment") {
                   const v = create(input);
+                  if (newMode === "Protocol simulation") {
+                    const trial = preset();
+                    v.trial = trial;
+                    delete v.ach;
+                    v.version = OPTION;
+                    v.parameters = [OPTION];
+                    v.datasets = [sources[trial.plan.context].id];
+                  }
                   await save(v);
                   open(v);
                 } else if (modal === "Add annotation") {
@@ -1165,6 +1266,9 @@ function App() {
                     created: exp.created,
                     model: exp.model,
                     version: exp.version,
+                    ...(exp.trial
+                      ? { trial: preset(exp.trial.plan.context) }
+                      : {}),
                     ...(!exp.ach
                       ? {
                           ach: undefined,
@@ -1186,6 +1290,20 @@ function App() {
           >
             <div className="mini">PHARMALAB WORKSPACE</div>
             <h2>{modal}</h2>
+            {modal === "New experiment" && (
+              <label>
+                Experiment type
+                <select
+                  value={newMode}
+                  onChange={(e) => setNewMode(e.target.value)}
+                >
+                  <option>Protocol simulation</option>
+                  <option value="Simulation">
+                    Bath calculations only (v1)
+                  </option>
+                </select>
+              </label>
+            )}
             {modal === "Reset experiment" ? (
               <p>
                 Clear this experiment’s notes, settings, and action history?

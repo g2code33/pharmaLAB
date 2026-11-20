@@ -1,3 +1,4 @@
+import { controlPotency as potency } from "../evidence/register";
 import { useState } from "react";
 import {
   evidence,
@@ -78,6 +79,24 @@ export function EvidenceReplay() {
             </p>
           </details>
         ))}
+      {(filter === "All preparations" || filter === "MPLM") && (
+        <details className="history">
+          <summary>MPLM · isometric · EC50: {potency.value} µM</summary>
+          <p>
+            DIRECT_REPORTED · pEC50 {potency.pEC50} ±{" "}
+            {potency.uncertainty.value} SEM. {potency.context.n}. Fig 2a
+            control, pp. 109–110.
+          </p>
+          <p>
+            {potency.context.volumeMl} mL · {potency.context.temperatureC} °C ·{" "}
+            {potency.context.gas} · {potency.context.loadG} g.{" "}
+            {potency.context.solution}. {potency.notes}
+          </p>
+          <a href={potency.context.url} target="_blank" rel="noreferrer">
+            {potency.context.publication}
+          </a>
+        </details>
+      )}
       <EndpointPlot filter={filter} />
       <p>
         No reviewed concentration series or calibrated trace. EC50, Emax and

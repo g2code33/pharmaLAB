@@ -17,6 +17,7 @@ test("workspace, local record and offline restart", async ({
       );
   });
   await page.getByRole("button", { name: "New experiment" }).click();
+  await page.getByLabel("Experiment type").selectOption("Simulation");
   await page.getByLabel("Experiment name").fill("Practical notebook");
   await page.getByRole("button", { name: "Start experiment" }).click();
   await page.getByLabel("Stock concentration", { exact: true }).fill("100");
